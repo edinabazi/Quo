@@ -52,7 +52,7 @@ macOS 14 or later, with Xcode 16 or a Swift 6 toolchain. No dependencies beyond 
 ./quo.sh install    # the same, then into /Applications (quits Quo first)
 ```
 
-`quo.sh` is `build.sh` with a name and bundle ID of its own (`SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo`). The app's data folder, settings and WebKit container all follow the bundle ID; the code still says "Search" by default, so upstream changes merge cleanly.
+`quo.sh` is `build.sh` with a name, a bundle ID and an icon mark of its own (`SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_MARK=Icon/quo-mark.svg`). The app's data folder, settings and WebKit container all follow the bundle ID; the code still says "Search" by default, so upstream changes merge cleanly.
 
 It signs with the first Developer ID certificate in your keychain, or ad hoc if there is none (then the first launch needs right-click › Open).
 
@@ -96,4 +96,4 @@ How Search is put together (one file per concern in `Sources/Search/`, the `./be
 
 ## License
 
-MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun; Quo still uses that icon for now, so it isn't one to hand out as is.
+MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun. Quo has its own icon, a white Q cut from a black tile (`Icon/quo-mark.svg`, set in Inter Tight, OFL); the logo inside Settings › About and the welcome screen is still Search's for now.

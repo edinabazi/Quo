@@ -11,7 +11,10 @@
 # for the login password once, since the two are signed by different people.
 set -euo pipefail
 cd "$(dirname "$0")"
-SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo ./build.sh release app
+# Its icon: a soft tile with a Q cut out (Icon/quo-mark.svg), drawn by
+# Icon/icon.swift on the same white plate as Search's.
+SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo \
+  SEARCH_MARK=Icon/quo-mark.svg SEARCH_MARK_FRACTION=0.56 ./build.sh release app
 if [ "${1:-}" = "install" ]; then
   osascript -e 'tell application id "com.edinabazi.quo" to quit' 2>/dev/null || true
   sleep 1
