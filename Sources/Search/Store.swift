@@ -98,8 +98,18 @@ enum Store {
     /// differ from stores made by identifier in how long extension workers
     /// are let live.
     static var ownContainer: Bool {
-        (Bundle.main.bundleIdentifier ?? "") != "com.officecommun.search"
+        (Bundle.main.bundleIdentifier ?? "") != home
     }
+
+    /// What this copy is called on disk: its folder in Application Support,
+    /// "Search", or a fork's own name (build.sh's SEARCH_NAME), so a fork
+    /// built from this code keeps its tabs, history and settings apart from
+    /// the Search it came from.
+    static let name: String = Bundle.main.object(forInfoDictionaryKey: "SearchFolderName") as? String ?? "Search"
+    /// The bundle id this copy ships under: Search's, or a fork's own. Its
+    /// WebKit container and its settings go with it.
+    static let home: String = Bundle.main.object(forInfoDictionaryKey: "SearchHomeIdentifier") as? String
+        ?? "com.officecommun.search"
 
     /// The fixed identifiers of a test world's WebKit stores: 1 for websites,
     /// 2 for extensions. The test world's are 5E4C0000-0000-4000-8000-00000000000k,
@@ -123,8 +133,8 @@ enum Store {
     static let folder: URL = {
         let support = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let home = support.appendingPathComponent(world.map { "Search (\($0))" } ?? "Search", isDirectory: true)
-        if !testing {
+        let home = support.appendingPathComponent(world.map { "\(name) (\($0))" } ?? name, isDirectory: true)
+        if !testing, name == "Search" {
             let old = support.appendingPathComponent("Office Browser", isDirectory: true)
             let files = FileManager.default
             if !files.fileExists(atPath: home.path), files.fileExists(atPath: old.path) {

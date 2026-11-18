@@ -156,6 +156,13 @@ final class Preferences: ObservableObject {
         didSet { store.set(navigationLeft, forKey: "toolbar.left") }
     }
 
+    /// With the tabs down the side, a bar above the page with back, forward
+    /// and reload, the whole address, and the extensions' buttons, as Chrome
+    /// and Dia have one (see AddressBar.swift). Off unless asked for.
+    @Published var addressBar: Bool {
+        didSet { store.set(addressBar, forKey: "sidebar.addressBar") }
+    }
+
     /// The tab strip only a few points taller than its tabs, where it is
     /// otherwise a toolbar's height (Metrics.strip). With the tabs across the
     /// top; off unless asked for.
@@ -973,6 +980,7 @@ final class Preferences: ObservableObject {
     init() {
         Preferences.settleLittleLinks(in: store)
         navigationLeft = store.bool(forKey: "toolbar.left")
+        addressBar = store.bool(forKey: "sidebar.addressBar")
         compactStrip = store.bool(forKey: "tabs.compact")
         // Carried over from when there were four ways of holding the browser
         // and this was one of them.
@@ -1249,6 +1257,7 @@ final class Preferences: ObservableObject {
     func reread() {
         take(\.look, "look", store.string(forKey: "look").flatMap(Look.init), or: .system)
         take(\.navigationLeft, store.bool(forKey: "toolbar.left"))
+        take(\.addressBar, store.bool(forKey: "sidebar.addressBar"))
         take(\.compactStrip, store.bool(forKey: "tabs.compact"))
         take(\.sidebar, "sidebar", store.object(forKey: "sidebar") as? Bool,
              or: store.string(forKey: "manner").map { $0 == "side" } ?? SidebarDefault.fresh(testing: Store.testing))

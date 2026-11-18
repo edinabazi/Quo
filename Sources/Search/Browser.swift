@@ -2289,10 +2289,15 @@ final class Browser: NSObject, ObservableObject {
     /// The address the edit began with: nothing is offered for that.
     private var tabOriginal = ""
 
+    /// The address bar is over the page (Settings › Tabs › Address bar
+    /// above the page): the address is edited there, not in the tab's row.
+    var addressBarUp: Bool { prefs.addressBar && prefs.sidebar && !folded }
+
     func beginTabEdit(_ tab: Tab) {
         // The column of icons has no row to type in: the field over the
-        // page, with the address in it, as ⌘L brings it.
-        guard let url = tab.shownURL, !prefs.iconColumn else {
+        // page, with the address in it, as ⌘L brings it. The address bar
+        // has one, whatever the column shows.
+        guard let url = tab.shownURL, !prefs.iconColumn || addressBarUp else {
             edit()
             return
         }
@@ -7341,6 +7346,13 @@ final class Browser: NSObject, ObservableObject {
     /// ⌘L. The current address comes up selected, so typing over it replaces it
     /// and Escape puts it back.
     func edit() {
+        // With the address bar up, ⌘L is its field, as in Chrome: the
+        // address there, selected. Again, put away. A blank tab and words
+        // carried over from ⌘T or ⌘K keep the field over the page.
+        if addressBarUp, !editing, !summoning, !launching, let tab = active, !tab.isBlank, tab.shownURL != nil {
+            if editingTab == tab.id { cancelTabEdit() } else { beginTabEdit(tab) }
+            return
+        }
         // Again while it is up over the page: put away, as Escape would.
         if editing, !summoning, !launching, active?.isBlank == false {
             putAway()

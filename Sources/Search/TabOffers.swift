@@ -137,10 +137,14 @@ private struct TabOffersList: View {
                     .onTapGesture { browser.takeTabOffer(offer) }
             }
         }
-        .padding(6)
-        .background(Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
+        .padding(m.listAir)
+        .background(Palette.ground, in: RoundedRectangle(cornerRadius: m.corner, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: m.corner, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
         .padding(8)
         .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+        .environment(\.fieldMeasures, m)
     }
+
+    /// A size up with Roomier tabs, as ⌘L's list is.
+    private var m: FieldMeasures { FieldMeasures(roomy: browser.prefs.roomyTabs) }
 }

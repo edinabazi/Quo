@@ -12,6 +12,40 @@ final class FieldState: ObservableObject {
     @Published var siteOffer: SearchSite?
 }
 
+/// The field's and its list's measures: as they always were, or a size up
+/// with Settings › Tabs › Roomier tabs, as the column's rows are.
+struct FieldMeasures {
+    var roomy = false
+    var text: CGFloat { roomy ? 17 : 15.5 }
+    var line: CGFloat { roomy ? 24 : 22 }
+    var air: CGFloat { roomy ? 18 : 14 }
+    var side: CGFloat { roomy ? 26 : 22 }
+    var corner: CGFloat { roomy ? 16 : 14 }
+    var width: CGFloat { roomy ? 640 : Metrics.fieldWidth }
+    /// The field's own height: its line of text and the air above and below.
+    var height: CGFloat { line + air * 2 }
+    var rowText: CGFloat { roomy ? 14.5 : 13 }
+    var rowNote: CGFloat { roomy ? 13 : 12 }
+    var icon: CGFloat { roomy ? 16 : 14 }
+    var glyph: CGFloat { roomy ? 11.5 : 10 }
+    var rowAir: CGFloat { roomy ? 11 : 9 }
+    var rowSide: CGFloat { roomy ? 14 : 12 }
+    var rowCorner: CGFloat { roomy ? 10 : 9 }
+    var listAir: CGFloat { roomy ? 7 : 6 }
+}
+
+private struct FieldMeasuresKey: EnvironmentKey {
+    static let defaultValue = FieldMeasures()
+}
+
+extension EnvironmentValues {
+    /// Set where a field or a list of places is put up; its rows read it.
+    var fieldMeasures: FieldMeasures {
+        get { self[FieldMeasuresKey.self] }
+        set { self[FieldMeasuresKey.self] = newValue }
+    }
+}
+
 /// One field, in the middle, and the few places it thinks you mean. It takes
 /// addresses and only addresses: type something that isn't a place and it
 /// shivers and says so, rather than quietly handing your keystrokes to a
@@ -22,10 +56,9 @@ struct Omnibox: View {
     /// Raised over a page by ⌘L, rather than standing on an empty tab.
     let over: Bool
 
-    /// The field's own height — the 22 of text and 14 of air above and below it
-    /// that `field` lays out — so the list can sit below it without being
-    /// stacked with it.
-    private static let fieldHeight: CGFloat = 22 + 14 * 2
+    /// The field's measures, roomier with Roomier tabs. Its height is what
+    /// the list sits below, without being stacked with it.
+    private var m: FieldMeasures { FieldMeasures(roomy: browser.prefs.roomyTabs) }
 
     @State private var shake: CGFloat = 0
     @State private var refused = false
@@ -47,12 +80,13 @@ struct Omnibox: View {
         Group {
             if fitted {
                 GeometryReader { geometry in
-                    content(width: min(Metrics.fieldWidth, max(0, geometry.size.width - 28)))
+                    content(width: min(m.width, max(0, geometry.size.width - 28)))
                 }
             } else {
-                content(width: Metrics.fieldWidth)
+                content(width: m.width)
             }
         }
+        .environment(\.fieldMeasures, m)
         .allowsHitTesting(browser.fieldShowing)
     }
 
@@ -82,7 +116,7 @@ struct Omnibox: View {
                     if !browser.offers.isEmpty || browser.siteOffer != nil || browser.switcherNote != nil {
                         list
                             .frame(width: width)
-                            .offset(y: Self.fieldHeight + 8)
+                            .offset(y: m.height + 8)
                     }
                 }
                 // Lifted a little above centre: dead centre reads as low,
@@ -111,9 +145,9 @@ struct Omnibox: View {
             AddressField(browser: browser, tab: tab)
         }
             .animation(Motion.quick, value: browser.siteChip)
-            .frame(height: 22)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 14)
+            .frame(height: m.line)
+            .padding(.horizontal, m.side)
+            .padding(.vertical, m.air)
             .background {
                 ZStack {
                     // A slow, almost invisible breath under the field. It is
@@ -122,12 +156,12 @@ struct Omnibox: View {
                     // an app.
                     Breath()
 
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: m.corner, style: .continuous)
                         .fill(Palette.ground)
                 }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: m.corner, style: .continuous)
                     .strokeBorder(
                         refused ? Color.red.opacity(0.35) : Palette.hairline,
                         lineWidth: 1
@@ -171,17 +205,17 @@ struct Omnibox: View {
             }
             if let note = browser.switcherNote {
                 Text(note)
-                    .font(.system(size: 13))
+                    .font(.system(size: m.rowText))
                     .foregroundStyle(Palette.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, m.rowSide)
+                    .padding(.vertical, m.rowAir)
             }
         }
-        .padding(6)
-        .background(Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(m.listAir)
+        .background(Palette.ground, in: RoundedRectangle(cornerRadius: m.corner, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: m.corner, style: .continuous)
                 .strokeBorder(Palette.hairline, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.07), radius: 20, y: 6)
@@ -195,10 +229,11 @@ struct Omnibox: View {
         /// quieter mark, and changes nothing but the look of the row.
         let picked: Bool
 
+        @Environment(\.fieldMeasures) private var m
         @State private var hovering = false
 
         var body: some View {
-            HStack(spacing: 10) {
+            HStack(spacing: m.roomy ? 12 : 10) {
                 // Every row has the same column before its words, so the
                 // words line up whatever stands in it.
                 Group {
@@ -210,7 +245,7 @@ struct Omnibox: View {
                         // Nothing is fetched for one that isn't known; the
                         // glass is what every search row wears until then.
                         if let icon = Favicons.shared.cached(for: offer.url) {
-                            Mark(icon: icon, letter: "", size: 14)
+                            Mark(icon: icon, letter: "", size: m.icon)
                         } else {
                             symbol("magnifyingglass")
                         }
@@ -226,20 +261,20 @@ struct Omnibox: View {
                         // from what this Mac already keeps, nothing fetched
                         // while typing, and the site's letter until a visit
                         // brings one.
-                        Mark(icon: Favicons.shared.cached(for: offer.url), letter: letter, size: 14)
+                        Mark(icon: Favicons.shared.cached(for: offer.url), letter: letter, size: m.icon)
                     }
                 }
-                .frame(width: 14, height: 14)
+                .frame(width: m.icon, height: m.icon)
                 // The row reads as 1.0.4's did, without the www; the key
                 // itself keeps it, for completing and going there.
                 Text(offer.kind == .suggested || offer.kind == .searched ? offer.key : Address.withoutWWW(offer.key))
-                    .font(.system(size: 13))
+                    .font(.system(size: m.rowText))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
 
                 if !offer.title.isEmpty {
                     Text(offer.title)
-                        .font(.system(size: 12))
+                        .font(.system(size: m.rowNote))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -248,7 +283,7 @@ struct Omnibox: View {
                 // A command's key, as Arc's Command Bar shows it.
                 if case .command(let command) = offer.kind, let key = command.key {
                     Text(key)
-                        .font(.system(size: 12))
+                        .font(.system(size: m.rowNote))
                         .foregroundStyle(Palette.muted)
                 }
                 if offer.kind == .bookmark {
@@ -257,14 +292,14 @@ struct Omnibox: View {
                     symbol("bookmark")
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+            .padding(.horizontal, m.rowSide)
+            .padding(.vertical, m.rowAir)
             .background {
                 if picked {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous)
                         .fill(Palette.wash)
                 } else if hovering {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous)
                         .fill(Palette.hover)
                 }
             }
@@ -274,7 +309,7 @@ struct Omnibox: View {
 
         private func symbol(_ name: String) -> some View {
             Image(systemName: name)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: m.glyph, weight: .medium))
                 .foregroundStyle(Palette.muted)
         }
 
@@ -290,6 +325,7 @@ struct Omnibox: View {
 /// A site's icon when this Mac has it, or a glass.
 private struct SiteIcon: View {
     let site: SearchSite
+    @Environment(\.fieldMeasures) private var m
     var body: some View {
         let host = site.host.split(separator: "/").first.map(String.init) ?? site.host
         // By where its search goes first, as the rows below it are, so the
@@ -300,13 +336,13 @@ private struct SiteIcon: View {
             Image(nsImage: icon)
                 .resizable()
                 .interpolation(.high)
-                .frame(width: 14, height: 14)
+                .frame(width: m.icon, height: m.icon)
                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
         } else {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: m.glyph, weight: .medium))
                 .foregroundStyle(Palette.muted)
-                .frame(width: 14, height: 14)
+                .frame(width: m.icon, height: m.icon)
         }
     }
 }
@@ -315,17 +351,18 @@ private struct SiteIcon: View {
 /// before what is typed.
 private struct SiteChip: View {
     let site: SearchSite
+    @Environment(\.fieldMeasures) private var m
     var body: some View {
         HStack(spacing: 6) {
             SiteIcon(site: site)
             Text(site.name)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: m.rowText, weight: .medium))
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
                 .fixedSize()
         }
         .padding(.horizontal, 8)
-        .frame(height: 22)
+        .frame(height: m.line)
         .background(Palette.wash, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Searching \(site.name)")
@@ -335,12 +372,13 @@ private struct SiteChip: View {
 /// "Search Reddit", first in the list, with the key that takes it.
 private struct SiteOfferRow: View {
     let site: SearchSite
+    @Environment(\.fieldMeasures) private var m
     @State private var hovering = false
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: m.roomy ? 12 : 10) {
             SiteIcon(site: site)
             Text("Search \(site.name)")
-                .font(.system(size: 13))
+                .font(.system(size: m.rowText))
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -351,10 +389,10 @@ private struct SiteOfferRow: View {
                 .frame(height: 18)
                 .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, m.rowSide)
+        .padding(.vertical, m.rowAir)
         .background {
-            if hovering { RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Palette.hover) }
+            if hovering { RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous).fill(Palette.hover) }
         }
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
@@ -478,7 +516,7 @@ struct AddressField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 15.5)
+        field.font = .systemFont(ofSize: Self.textSize(browser))
         field.textColor = Palette.NS.ink
         field.lineBreakMode = .byClipping
         field.cell?.usesSingleLineMode = true
@@ -489,10 +527,15 @@ struct AddressField: NSViewRepresentable {
         // SwiftUI picks its own colour for a placeholder, and on a pale ground
         // that colour was near-white.
         let words = Self.placeholderWords(for: browser)
-        field.placeholderAttributedString = Self.placeholder(words)
+        field.placeholderAttributedString = Self.placeholder(words, size: Self.textSize(browser))
         field.setAccessibilityLabel(Self.accessibilityName(for: browser))
         context.coordinator.placeheld = words
         return field
+    }
+
+    /// The text's size: a size up with Roomier tabs (FieldMeasures).
+    @MainActor private static func textSize(_ browser: Browser) -> CGFloat {
+        FieldMeasures(roomy: browser.prefs.roomyTabs).text
     }
 
     /// What the empty field asks for: with a site put in it with Tab, the
@@ -519,11 +562,11 @@ struct AddressField: NSViewRepresentable {
         }
     }
 
-    private static func placeholder(_ words: String) -> NSAttributedString {
+    private static func placeholder(_ words: String, size: CGFloat) -> NSAttributedString {
         NSAttributedString(
             string: words,
             attributes: [
-                .font: NSFont.systemFont(ofSize: 15.5),
+                .font: NSFont.systemFont(ofSize: size),
                 .foregroundColor: NSColor(Palette.ink.opacity(0.3)),
             ]
         )
@@ -549,10 +592,15 @@ struct AddressField: NSViewRepresentable {
             coordinator.select(from: browser.typed.count, in: field)
         }
 
+        let size = Self.textSize(browser)
+        if field.font?.pointSize != size {
+            field.font = .systemFont(ofSize: size)
+            coordinator.placeheld = nil
+        }
         let words = Self.placeholderWords(for: browser)
         if coordinator.placeheld != words {
             coordinator.placeheld = words
-            field.placeholderAttributedString = Self.placeholder(words)
+            field.placeholderAttributedString = Self.placeholder(words, size: size)
             field.setAccessibilityLabel(Self.accessibilityName(for: browser))
             DispatchQueue.main.async { coordinator.showPlaceholder(in: field) }
         }

@@ -412,7 +412,7 @@ struct SearchApp: App {
 private struct QuitAndHelp: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appTermination) {
-            Button("Quit Search") {
+            Button("Quit \(Store.name)") {
                 if Links.shouldQuit() { NSApp.terminate(nil) }
             }
             .keyboardShortcut("q", modifiers: .command)
@@ -556,13 +556,24 @@ struct ContentView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
+            // The address bar, beside the column's top, above the page's card
+            // and no wider (AddressBar.swift).
+            if addressShown {
+                AddressBar(browser: browser, onFrame: cards)
+                    .padding(.leading, sideOnRight ? farGap : chrome.width)
+                    .padding(.trailing, sideOnRight ? chrome.width : farGap)
+                    .padding(.top, band)
+                    .transition(.opacity)
+            }
+
             // The bookmarks bar, under the strip or beside the column's top —
             // there on the window's ground above the page's card, and no wider.
+            // Under the address bar when there is one.
             if barShown {
                 BookmarksBar(browser: browser, bookmarks: browser.bookmarks, onFrame: cards)
                     .padding(.leading, sideOnRight ? farGap : chrome.width)
                     .padding(.trailing, sideOnRight ? chrome.width : farGap)
-                    .padding(.top, band)
+                    .padding(.top, band + (addressShown ? AddressBar.height(browser.prefs) : 0))
                     .transition(.opacity)
             }
         }
@@ -638,10 +649,10 @@ struct ContentView: View {
     /// still leaves the card's gap, and so does the top, unless the bookmarks
     /// bar is there.
     private var chrome: CGSize {
-        let bar = barShown ? BookmarksBar.height : 0
+        let bar = (barShown ? BookmarksBar.height : 0) + (addressShown ? AddressBar.height(browser.prefs) : 0)
         if cards {
             return CGSize(width: sidebar ? sideWidth : Metrics.cardGap,
-                          height: barShown ? bar : Metrics.cardGap)
+                          height: bar > 0 ? bar : Metrics.cardGap)
         }
         return CGSize(width: sidebar ? sideWidth : 0, height: band + bar)
     }
@@ -700,6 +711,12 @@ struct ContentView: View {
     private var barShown: Bool {
         browser.prefs.bookmarksBar && !browser.bookmarks.isEmpty && !browser.folded
             && fullscreenTab == nil
+    }
+
+    /// The address bar is up: asked for, the tabs down the side and not
+    /// folded away, and no video filling the screen.
+    private var addressShown: Bool {
+        browser.addressBarUp && fullscreenTab == nil
     }
 
     /// The room the page is laid out to leave them, which is not animated.

@@ -122,9 +122,12 @@ struct SideBar: View {
                 HStack(spacing: 0) {
                     DragStrip(menu: columnMenu)
                         .frame(width: 10 + lights)
-                    Color.clear
-                        .frame(width: Metrics.helm)
-                        .allowsHitTesting(false)
+                    // The doors' place, unless the address bar has them.
+                    if !browser.addressBarUp {
+                        Color.clear
+                            .frame(width: Metrics.helm)
+                            .allowsHitTesting(false)
+                    }
                     DragStrip(menu: columnMenu)
                 }
                 .frame(height: Metrics.strip)
@@ -139,13 +142,16 @@ struct SideBar: View {
                     // The lights stacked in their band (Lights, vertical),
                     // the three doors one above the other under them.
                     Color.clear.frame(height: lightsBand)
-                    Helm(browser: browser, vertical: true)
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 8)
+                    // With the address bar up, the three doors are in it.
+                    if !browser.addressBarUp {
+                        Helm(browser: browser, vertical: true)
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 8)
+                    }
                 } else {
                     HStack(spacing: 0) {
                         Color.clear.frame(width: lights)
-                        Helm(browser: browser)
+                        if !browser.addressBarUp { Helm(browser: browser) }
                         Spacer(minLength: 0)
                     }
                     .frame(height: Metrics.strip)
@@ -1184,7 +1190,7 @@ struct SideBar: View {
     /// The foot's door and its margin beneath; with icons only, its doors
     /// one above the other.
     private var footHeight: CGFloat {
-        icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging)) * 28 + 8 : 26 + 10
+        icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging, puzzle: !browser.addressBarUp)) * 28 + 8 : 26 + 10
     }
     /// Between what plays in another tab and the foot's doors.
     private static let playerGap: CGFloat = 4
@@ -1236,7 +1242,9 @@ private struct SideFoot: View {
                 // An agent connected in this window: a click on it is Stop.
                 AgentStatus(browser: browser, style: .icon)
                 FetchDoor(browser: browser, fetches: fetches, arrowEdge: prefs.sidePosition == .right ? .leading : .trailing)
-                ExtensionSlot(browser: browser, edge: prefs.sidePosition == .right ? .leading : .trailing, room: 0)
+                if !browser.addressBarUp {
+                    ExtensionSlot(browser: browser, edge: prefs.sidePosition == .right ? .leading : .trailing, room: 0)
+                }
                 BookmarkDoor(browser: browser, arrowEdge: prefs.sidePosition == .right ? .leading : .trailing)
                 if prefs.usesSpaces { SpaceDot(browser: browser) }
                 if Profiles.shared.several { ProfileBadge(browser: browser) }
@@ -1247,7 +1255,10 @@ private struct SideFoot: View {
             HStack(spacing: 2) {
                 if Profiles.shared.several { ProfileBadge(browser: browser) }
                 if prefs.usesSpaces { SpaceDot(browser: browser) }
-                ExtensionSlot(browser: browser, edge: .trailing, room: room)
+                // At the address bar's far end while it is up.
+                if !browser.addressBarUp {
+                    ExtensionSlot(browser: browser, edge: .trailing, room: room)
+                }
                 BookmarkDoor(browser: browser, arrowEdge: .trailing)
                 // Only while a download is running, and a moment after.
                 FetchDoor(browser: browser, fetches: fetches, arrowEdge: prefs.sidePosition == .right ? .leading : .trailing)
@@ -1259,8 +1270,8 @@ private struct SideFoot: View {
     }
 
     /// How many doors the foot has, stacked: what the rows stop short of.
-    @MainActor static func doors(_ prefs: Preferences, _ fetches: Fetches, hanging: Bool = false) -> Int {
-        var kept = 2  // the puzzle and bookmarks
+    @MainActor static func doors(_ prefs: Preferences, _ fetches: Fetches, hanging: Bool = false, puzzle: Bool = true) -> Int {
+        var kept = puzzle ? 2 : 1  // the puzzle and bookmarks
         if prefs.usesSpaces { kept += 1 }
         if Profiles.shared.several { kept += 1 }
         if FetchDoor.shows(fetches, prefs, hanging: hanging) { kept += 1 }
@@ -1271,7 +1282,7 @@ private struct SideFoot: View {
     /// is 26 points, with 2 between them.
     private var room: Int {
         let door: CGFloat = 26 + 2
-        var kept = 2  // the puzzle and bookmarks
+        var kept = browser.addressBarUp ? 1 : 2  // the puzzle and bookmarks
         if prefs.usesSpaces { kept += 1 }
         if Profiles.shared.several { kept += 1 }
         if FetchDoor.shows(fetches, prefs, hanging: browser.downloadsHanging) { kept += 1 }
@@ -1469,7 +1480,9 @@ private struct SideRow: View, Equatable {
         self.pill = pill
         self.close = close
         self.interactive = interactive
-        editing = browser.editingTab == tab.id
+        // With the address bar up, the address is edited there; a name
+        // still is here.
+        editing = browser.editingTab == tab.id && (browser.renamingTab || !browser.addressBarUp)
         selected = browser.selectedTabIDs.contains(tab.id)
         pickedAmongOthers = browser.isPickedAmongOthers(tab)
         peek = browser.peekFrom == tab.id ? browser.peekTab : nil
@@ -1504,7 +1517,10 @@ private struct SideRow: View, Equatable {
     private var peeking: Bool { !editing && tab.pin != nil && peek != nil }
     /// Where the page is, said on the row you're on (Settings › Tabs › Show
     /// the address on the tab you're on).
-    private var rest: AtRest? { live && !editing ? AtRest.said(tab.restAddress, always: prefs.showsAddress) : nil }
+    /// Never with the address bar up: the bar says it, the row its title.
+    private var rest: AtRest? {
+        live && !editing && !browser.addressBarUp ? AtRest.said(tab.restAddress, always: prefs.showsAddress) : nil
+    }
     private var atRest: Bool { rest != nil }
     /// A pin already put down has nothing left to put down: no minus (#1050).
     private var closable: Bool { tab.pin == nil || !tab.asleep }
@@ -1836,6 +1852,8 @@ struct Door: View {
     /// What holding the button down opens, as Back and Forward list the
     /// pages that way. Nil, or a nil menu, and a hold is just a slow click.
     var held: (() -> NSMenu?)? = nil
+    /// Its square: 26 points, or more beside the address bar's roomier field.
+    var side: CGFloat = 26
     let act: () -> Void
 
     @State private var hovering = false
@@ -1848,9 +1866,9 @@ struct Door: View {
             if opened { opened = false } else { act() }
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11 * side / 26, weight: .medium))
                 .foregroundStyle(on ? Palette.ink : (hovering ? Palette.ink.opacity(0.7) : Palette.muted))
-                .frame(width: 26, height: 26)
+                .frame(width: side, height: side)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(on ? greys.wash : (hovering ? greys.hover : .clear))

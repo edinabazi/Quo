@@ -571,6 +571,11 @@ struct SettingsPanel: View {
                      ))
         case "layout.cardsFullScreen": Switch(on: $prefs.cardsInFullScreen)
         case "toolbar.left": Switch(on: $prefs.navigationLeft)
+        case "sidebar.addressBar":
+            Switch(on: Binding(
+                get: { prefs.addressBar },
+                set: { on in withAnimation(Motion.glide) { prefs.addressBar = on } }
+            ))
         case "tabs.compact":
             Switch(on: Binding(
                 get: { prefs.compactStrip },
@@ -1048,10 +1053,11 @@ struct SettingsPanel: View {
                 .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
                 .frame(height: 34)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Search")
+                Text(Store.name)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                Text("by Office Commun · version \(Updater.version)")
+                Text(Updater.official ? "by Office Commun · version \(Updater.version)"
+                                      : "a fork of Search by Office Commun · version \(Updater.version)")
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
             }

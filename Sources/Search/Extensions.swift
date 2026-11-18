@@ -2314,10 +2314,13 @@ struct ExtensionSlot: View {
     /// How many pinned ones the row has room for; the rest are only in the
     /// list. Nil: all of them.
     var room: Int? = nil
+    /// Each button's square: 26 points, or more in the address bar with
+    /// Roomier tabs, beside its taller field.
+    var side: CGFloat = 26
 
     var body: some View {
         if #available(macOS 15.4, *) {
-            ExtensionButtons(browser: browser, extensions: .shared, edge: edge, room: room)
+            ExtensionButtons(browser: browser, extensions: .shared, edge: edge, room: room, side: side)
         }
     }
 }
@@ -2328,17 +2331,18 @@ private struct ExtensionButtons: View {
     @ObservedObject var extensions: Extensions
     let edge: Edge
     var room: Int?
+    var side: CGFloat = 26
 
     var body: some View {
         if !extensions.installed.isEmpty {
             HStack(spacing: 2) {
                 ForEach(extensions.buttons.filter(\.pinned).prefix(room ?? .max)) { button in
-                    ActionButton(button: button) { extensions.press(button.id, in: browser) }
+                    ActionButton(button: button, side: side) { extensions.press(button.id, in: browser) }
                         .background(Anchor(id: button.id, browser: browser))
                         .contextMenu { ExtensionActions(id: button.id, name: button.name, browser: browser, extensions: extensions) }
                 }
                 let key = Extensions.menuKey(browser)
-                Door(icon: "puzzlepiece.extension", on: extensions.menuOwner == key, help: "Extensions") {
+                Door(icon: "puzzlepiece.extension", on: extensions.menuOwner == key, help: "Extensions", side: side) {
                     extensions.menuOwner = extensions.menuOwner == key ? nil : key
                 }
                 .background(Anchor(id: Extensions.menuAnchor, browser: browser))
@@ -2355,13 +2359,15 @@ private struct ExtensionButtons: View {
 
     private struct ActionButton: View {
         let button: Extensions.Button
+        var side: CGFloat = 26
         let press: () -> Void
         @State private var hovering = false
 
         var body: some View {
             SwiftUI.Button(action: press) {
-                ExtensionIcon(button: button, size: 15)
-                    .frame(width: 26, height: 26)
+                // The icon grows with its square: 15 points in 26.
+                ExtensionIcon(button: button, size: (15 * side / 26).rounded())
+                    .frame(width: side, height: side)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(hovering ? Palette.hover : .clear)

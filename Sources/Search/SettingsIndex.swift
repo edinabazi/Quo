@@ -186,6 +186,11 @@ enum SettingsIndex {
               title: "Keep the card in full screen", detail: "Off, the page goes edge to edge when the window fills the screen",
               keys: ["layout.cardsFullScreen"], words: ["full screen", "fullscreen", "card", "margin", "rounded", "zen", "arc"],
               parent: "layout.cards"),
+        .init(id: "sidebar.addressBar", group: "window", icon: "link",
+              title: "Address bar above the page", detail: "The whole address, back, forward and reload, and the extensions, in a bar over the page",
+              more: "The extensions' buttons move from the foot of the sidebar to the bar's far end.",
+              keys: ["sidebar.addressBar"], words: ["url", "url bar", "omnibox", "toolbar", "full address", "chrome", "dia"],
+              parent: "tabs.layout"),
         .init(id: "toolbar.left", group: "window", icon: "arrow.left.arrow.right",
               title: "Back, forward and reload on the left", detail: "Beside the window's buttons, before the tabs",
               keys: ["toolbar.left"], words: ["toolbar", "buttons", "navigation"], parent: "tabs.layout"),
@@ -610,7 +615,7 @@ enum SettingsIndex {
         case "sidebar.hides", "sidebar.slides", "layout.cards", "pins.list": return prefs.sidebar
         case "layout.cardsFullScreen": return prefs.sidebar && prefs.cards
         case "pins.folders": return prefs.sidebar && prefs.listsPins
-        case "sidebar.foldIcons": return prefs.sidebar && !prefs.sideHides
+        case "sidebar.foldIcons", "sidebar.addressBar": return prefs.sidebar && !prefs.sideHides
         case "toolbar.left", "tabs.compact": return !prefs.sidebar
         case "profiles.oneWindow": return Profiles.shared.several
         case "spaces.links": return prefs.usesSpaces
@@ -631,7 +636,7 @@ enum SettingsIndex {
         case "inspector.dark": return "Only while Search isn't set to Dark"
         case "toolbar.left", "tabs.compact": return "Only with the tabs across the top"
         case "sidebar.roomy": return "Only with titles in the column"
-        case "sidebar.foldIcons": return "Only with the column down a side and not hidden until the edge"
+        case "sidebar.foldIcons", "sidebar.addressBar": return "Only with the column down a side and not hidden until the edge"
         case "profiles.oneWindow": return "Only with more than one profile"
         case "spaces.links": return "Only with Spaces on"
         case "sidebar.player": return "Only with titles in the sidebar"

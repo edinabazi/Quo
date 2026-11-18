@@ -1,0 +1,21 @@
+#!/bin/bash
+# Quo: this fork of Search, built under its own name and bundle id, so it
+# keeps its own data, settings and WebKit storage beside an installed Search.
+#
+#   ./quo.sh              build build/Quo.app
+#   ./quo.sh install      build it and put it in /Applications (quits Quo first)
+#
+# Data lives in ~/Library/Application Support/Quo, the defaults under
+# com.edinabazi.quo, cookies and site data in WebKit's container for that id.
+# Saved passwords are shared with Search through the keychain: each one asks
+# for the login password once, since the two are signed by different people.
+set -euo pipefail
+cd "$(dirname "$0")"
+SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo ./build.sh release app
+if [ "${1:-}" = "install" ]; then
+  osascript -e 'tell application id "com.edinabazi.quo" to quit' 2>/dev/null || true
+  sleep 1
+  rm -rf /Applications/Quo.app
+  cp -R build/Quo.app /Applications/Quo.app
+  echo "installed: /Applications/Quo.app"
+fi

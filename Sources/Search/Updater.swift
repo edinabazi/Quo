@@ -109,6 +109,10 @@ final class Updater: ObservableObject {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
     }
 
+    /// Search itself, not a fork built under a bundle id of its own: only
+    /// Search reads Office Commun's feed.
+    nonisolated static var official: Bool { Store.home == "com.officecommun.search" }
+
     nonisolated static var build: Int {
         Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "") ?? 0
     }
@@ -133,6 +137,9 @@ final class Updater: ObservableObject {
     func checkIfDue(then say: @escaping (String) -> Void) {
         self.say = say
         Swap.sweep()
+        // A fork is updated by whoever builds it: Office Commun's feed is
+        // for Search, and the team check would refuse its builds anyway.
+        guard Updater.official else { return }
         // And again every hour for as long as the app is up — a browser that
         // is left open for a week would otherwise never look.
         if clock == nil {
@@ -157,6 +164,10 @@ final class Updater: ObservableObject {
     /// Search › Check for Updates…: the result is said in the line at the
     /// foot of the window, and an available update is offered in the menu.
     func checkByHand() {
+        guard Updater.official else {
+            say?("\(Store.name) is your own build: it updates when you build it again")
+            return
+        }
         switch stage {
         case .ready(let next):
             say?("Search \(next.version) is ready — relaunch to use it")
@@ -179,6 +190,7 @@ final class Updater: ObservableObject {
     /// names, or nil when this is the latest; what becomes of it after that
     /// is said through the line handed to `checkIfDue`.
     func check(then done: @escaping (Release?) -> Void) {
+        guard Updater.official else { return done(nil) }
         guard !checking else { return }
         checking = true
         Task { [weak self] in

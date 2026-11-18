@@ -57,8 +57,12 @@ case "$ARCH" in
   x86_64) OUT="build/intel"; SUBFOLDER="/intel" ;;
   *) echo "SEARCH_ARCH is arm64 or x86_64, not “$ARCH”" >&2; exit 1 ;;
 esac
-APP="$OUT/Search.app"
-NAME="Search"
+# A fork builds under a name and bundle id of its own (SEARCH_NAME,
+# SEARCH_BUNDLE_ID), and with them a data folder and settings of its own
+# (Store.name, Store.home): ./quo.sh builds Quo this way.
+NAME="${SEARCH_NAME:-Search}"
+BUNDLE_ID="${SEARCH_BUNDLE_ID:-com.officecommun.search}"
+APP="$OUT/$NAME.app"
 # Asked for with SEARCH_DEV=1, a dev build, on a yellow plate and named for
 # the feature it's built from: "Search-split-view" in the menu bar, the Dock
 # and ⌘Tab, so it's never taken for the installed app beside it, or for the
@@ -183,7 +187,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>$NAME</string>
   <key>CFBundleDisplayName</key><string>$NAME</string>
   <key>CFBundleExecutable</key><string>$NAME</string>
-  <key>CFBundleIdentifier</key><string>com.officecommun.search</string>
+  <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
+  <key>SearchFolderName</key><string>$NAME</string>
+  <key>SearchHomeIdentifier</key><string>$BUNDLE_ID</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>

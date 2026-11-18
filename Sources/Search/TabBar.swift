@@ -575,17 +575,20 @@ struct Helm: View {
     @ObservedObject var browser: Browser
     /// One above the other, for the column of icons.
     var vertical = false
+    /// Each door's square: 26 points, or more in the address bar with
+    /// Roomier tabs.
+    var side: CGFloat = 26
 
     var body: some View {
         if let tab = browser.active {
-            Wheel(browser: browser, tab: tab, vertical: vertical)
+            Wheel(browser: browser, tab: tab, vertical: vertical, side: side)
         } else {
             // Nowhere to go and nothing to reload: the doors stay in place,
             // greyed, so the row doesn't shift when a tab arrives.
             Helm.stack(vertical) {
-                Door(icon: "chevron.left") {}
-                Door(icon: "chevron.right") {}
-                Door(icon: "arrow.clockwise") {}
+                Door(icon: "chevron.left", side: side) {}
+                Door(icon: "chevron.right", side: side) {}
+                Door(icon: "arrow.clockwise", side: side) {}
             }
             .opacity(0.3)
             .allowsHitTesting(false)
@@ -601,21 +604,23 @@ struct Helm: View {
         let browser: Browser
         @ObservedObject var tab: Tab
         var vertical = false
+        var side: CGFloat = 26
 
         var body: some View {
             let back = !tab.isBlank && tab.canGoBack
             let forward = !tab.isBlank && tab.canGoForward
             Helm.stack(vertical) {
-                Door(icon: "chevron.left", help: "Back   ⌘[", held: { Rewind.menu(tab, back: true) }) { browser.back() }
+                Door(icon: "chevron.left", help: "Back   ⌘[", held: { Rewind.menu(tab, back: true) }, side: side) { browser.back() }
                     .disabled(!back)
                     .opacity(back ? 1 : 0.3)
-                Door(icon: "chevron.right", help: "Forward   ⌘]", held: { Rewind.menu(tab, back: false) }) { browser.forward() }
+                Door(icon: "chevron.right", help: "Forward   ⌘]", held: { Rewind.menu(tab, back: false) }, side: side) { browser.forward() }
                     .disabled(!forward)
                     .opacity(forward ? 1 : 0.3)
                 // Reload, or stop while it is still coming.
                 Door(
                     icon: tab.loading ? "xmark" : "arrow.clockwise",
-                    help: tab.loading ? "Stop   ⌘." : "Reload   ⌘R"
+                    help: tab.loading ? "Stop   ⌘." : "Reload   ⌘R",
+                    side: side
                 ) {
                     if tab.loading { tab.stop() } else { browser.reload() }
                 }
@@ -1376,6 +1381,8 @@ enum CarryGuard {
 
 struct TabAddressField: NSViewRepresentable {
     @ObservedObject var browser: Browser
+    /// The text's size: a tab's, unless the address bar asks for its own.
+    var size: CGFloat = 12.5
 
     func makeCoordinator() -> Coordinator { Coordinator(browser: browser) }
 
@@ -1385,7 +1392,7 @@ struct TabAddressField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 12.5)
+        field.font = .systemFont(ofSize: size)
         field.textColor = Palette.NS.ink
         field.cell?.usesSingleLineMode = true
         field.cell?.wraps = false
@@ -1420,6 +1427,7 @@ struct TabAddressField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         let coordinator = context.coordinator
         coordinator.browser = browser
+        if field.font?.pointSize != size { field.font = .systemFont(ofSize: size) }
         if !coordinator.typing, field.stringValue != browser.tabDraft {
             field.stringValue = browser.tabDraft
         }
