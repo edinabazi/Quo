@@ -108,11 +108,34 @@ struct AddressBar: View {
             .help(shown?.absoluteString ?? "")
         }
 
+        /// White over whatever the bar lies on, never a grey of its own: on
+        /// the plain ground it lands a step lighter, as the opaque grey did,
+        /// and on a space's colour or gradient it takes the tint, where the
+        /// grey sat on it as a slab (as the column's rows do, see Greys).
+        /// Typing, it is the page's own ground, nearly solid, so the text
+        /// sits on something steady, with the colour just showing through.
         private var ground: some View {
-            let fill: Color = editing ? Palette.ground : hovering ? Palette.wash : Palette.hover
+            let fill: Color = editing ? Palette.ground.opacity(0.88) : hovering ? Field.lifted : Field.lift
             return Field.shape
                 .fill(fill)
-                .overlay { if editing { Field.shape.strokeBorder(Palette.faint, lineWidth: 1) } }
+                .overlay {
+                    Field.shape.strokeBorder(editing ? Palette.faint : Field.rim, lineWidth: editing ? 1 : 0.5)
+                }
+        }
+
+        static let lift = shade(light: 0.55, dark: 0.07)
+        static let lifted = shade(light: 0.8, dark: 0.11)
+        /// A rim just short of seen, so the field has an edge on a colour
+        /// close to its own.
+        static let rim = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(white: 1, alpha: 0.06) : NSColor(white: 0, alpha: 0.05)
+        })
+
+        private static func shade(light: CGFloat, dark: CGFloat) -> Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                NSColor(white: 1, alpha: appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light)
+            })
         }
 
         /// The address at rest, read out as one button: the whole address,
