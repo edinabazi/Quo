@@ -150,7 +150,29 @@ fi
 ICONSET="build/AppIcon.iconset"
 ICONDOC="build/AppIcon.icon"
 rm -rf "$ICONSET" "$ICONDOC"
-SEARCH_DEV="$DEV" swift Icon/icon.swift "$ICONSET" "$ICONDOC" > /dev/null
+# A fork with an Icon Composer document of its own (quo.sh: SEARCH_ICON)
+# uses it as it is, the Dock's styles and all; its flat pictures for the
+# .icns come from Icon Composer's own ictool, the plate 824 of 1024 as
+# Apple's grid has it, so it sits in Finder at the size other apps do.
+# Without Icon Composer installed, the mark is drawn as before.
+ICTOOL="/Applications/Icon Composer.app/Contents/Executables/ictool"
+if [ -n "${SEARCH_ICON:-}" ] && [ -d "$SEARCH_ICON" ] && [ -x "$ICTOOL" ]; then
+  cp -R "$SEARCH_ICON" "$ICONDOC"
+  mkdir -p "$ICONSET"
+  for SIDE in 16 32 128 256 512; do
+    for SCALE in 1 2; do
+      PX=$((SIDE * SCALE)); PLATE=$(( (PX * 824 + 512) / 1024 ))
+      AT=""; [ "$SCALE" = 2 ] && AT="@2x"
+      FILE="$ICONSET/icon_${SIDE}x${SIDE}$AT.png"
+      "$ICTOOL" "$PWD/$ICONDOC" --export-image --output-file "$PWD/$FILE" --platform macOS \
+        --rendition Default --width "$PLATE" --height "$PLATE" --scale 1 > /dev/null
+      sips --padToHeightWidth "$PX" "$PX" "$FILE" > /dev/null
+    done
+  done
+else
+  [ -n "${SEARCH_ICON:-}" ] && echo "note: no Icon Composer, so the icon is drawn from SEARCH_MARK" >&2
+  SEARCH_DEV="$DEV" swift Icon/icon.swift "$ICONSET" "$ICONDOC" > /dev/null
+fi
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$ICONSET"
 # macOS 26's Dark, Clear and Tinted Dock styles read the icon from an asset

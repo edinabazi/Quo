@@ -1128,10 +1128,24 @@ struct SettingsPanel: View {
 
     private var aboutHeader: some View {
         HStack(spacing: 14) {
-            Logomark()
-                .fill(Palette.ink, style: FillStyle(eoFill: true))
-                .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
-                .frame(height: 34)
+            if Store.name == "Search" {
+                Logomark()
+                    .fill(Palette.ink, style: FillStyle(eoFill: true))
+                    .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
+                    .frame(height: 34)
+            } else {
+                // A fork has an icon of its own, not Search's mark: the
+                // app's, its tile as tall as the mark was. The picture is
+                // Apple's 1024 grid, the tile 824 of it, so it is drawn
+                // larger and its clear margin hangs outside the row.
+                let side: CGFloat = (34.0 * 1024 / 824).rounded()
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: side, height: side)
+                    .padding((34 - side) / 2)
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(Store.name)
                     .font(.system(size: 15, weight: .semibold))
