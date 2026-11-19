@@ -36,6 +36,10 @@ Each list is turned into WebKit's own rules and compiled once, a few seconds for
 
 This is [driceroland/Search#738](https://github.com/driceroland/Search/pull/738) by [@oddharsh](https://github.com/oddharsh), which Search closed to stay small.
 
+### Chrome's reload keys
+
+**⇧⌘R** reloads the page from the server, skipping the cache, as in Chrome. Reading Mode moves to **⌥⌘R**. Search has them the other way round, as Safari does. Both can be changed in Settings › Keyboard & Mouse.
+
 ### Its own app
 
 Quo runs beside an installed Search without sharing anything with it:

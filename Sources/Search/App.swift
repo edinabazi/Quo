@@ -1763,10 +1763,12 @@ struct ContentView: View {
         guard flags.contains(.command) else { return false }
         let shifted = flags.contains(.shift)
 
+        // ⌥⌘R, Reading Mode: Quo keeps ⇧⌘R for the hard reload, as Chrome
+        // does (Search has them the other way round, as Safari does).
         if flags.contains(.option), !shifted, !flags.contains(.control),
            event.shortcutKey == "r" {
             if pageFirst(event, key: "r", shifted: false) { return false }
-            browser.reload(fromOrigin: true)
+            browser.toggleReader()
             return true
         }
 
@@ -1923,7 +1925,7 @@ struct ContentView: View {
         case "r" where !shifted:
             browser.reload()
         case "r" where shifted:
-            browser.toggleReader()
+            browser.reload(fromOrigin: true)
         case "[":
             shifted ? browser.step(-1) : browser.back()
         case "]":
