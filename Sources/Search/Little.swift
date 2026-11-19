@@ -998,7 +998,7 @@ struct PopupWindowView: View {
             LittleView(tab: tab, roomy: roomy, place: .of(browser), keep: nil).id(tab.id)
                 .overlay(alignment: .topLeading) {
                     if let asked = browser.suggesting, asked.tab == tab.id {
-                        AccountList(browser: browser, asked: asked).offset(y: roomy ? LittleView.roomyBar : LittleView.compactBar)
+                        AccountList(browser: browser, asked: asked, top: roomy ? LittleView.roomyBar : LittleView.compactBar)
                     }
                 }
                 .overlay(alignment: .bottom) {
