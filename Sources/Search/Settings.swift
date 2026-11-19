@@ -1660,24 +1660,28 @@ struct Pill: View {
     let title: String
     var filled = false
     var tint: Color = Palette.ink
+    /// A size up, for a bar that is (the small window for a link, Roomy).
+    var large = false
     let action: () -> Void
 
     @State private var hovering = false
 
-    init(_ title: String, filled: Bool = false, tint: Color = Palette.ink, action: @escaping () -> Void) {
+    init(_ title: String, filled: Bool = false, tint: Color = Palette.ink, large: Bool = false,
+         action: @escaping () -> Void) {
         self.title = title
         self.filled = filled
         self.tint = tint
+        self.large = large
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11.5))
+                .font(.system(size: large ? 13 : 11.5))
                 .foregroundStyle(filled ? Palette.ground : tint)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, large ? 13 : 10)
+                .padding(.vertical, large ? 7 : 5)
                 .background(filled ? Palette.ink : (hovering ? Palette.hover : Palette.ground), in: Capsule())
                 .overlay(Capsule().strokeBorder(filled ? .clear : Palette.hairline, lineWidth: 1))
                 .contentShape(Capsule())

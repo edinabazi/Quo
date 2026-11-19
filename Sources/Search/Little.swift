@@ -181,7 +181,15 @@ final class LittleWindow: NSObject, NSWindowDelegate {
         }
         window.delegate = self
         let id = tab.id
-        window.contentView = NSHostingView(rootView: LittleView(tab: tab, note: note, keep: { [weak self] in self?.keep() })
+        if Shared.prefs.roomyTabs {
+            Lights.keep(window, centreX: { _ in LittleView.roomyBar / 2 }, height: { _ in LittleView.roomyBar }) {}
+        }
+        // Roomy (Appearance › Size): a taller bar, the lights centred in it
+        // as the browser's window has them in its strip; Compact keeps the
+        // title bar's own.
+        let roomy = Shared.prefs.roomyTabs
+        window.contentView = NSHostingView(rootView: LittleView(tab: tab, note: note, roomy: roomy,
+                                                                keep: { [weak self] in self?.keep() })
             .overlay {
                 TabSwitcherOverlay(
                     switcher: LittleWindow.switcher,
@@ -393,16 +401,21 @@ struct LittleView: View {
     @ObservedObject var tab: Tab
     /// Its window's line at the foot; an extension's popup has none.
     var note: LittleNote? = nil
+    /// Appearance › Size is Roomy: the line taller, its words and button a
+    /// size up.
+    var roomy = false
     let keep: (() -> Void)?
+
+    static let roomyBar: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 // Room for the window's own buttons, which sit on this line.
-                Spacer().frame(width: 64)
+                Spacer().frame(width: roomy ? 70 : 64)
                 Spacer(minLength: 0)
                 Text(site)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: roomy ? 13.5 : 12.5, weight: .medium))
                     .foregroundStyle(Palette.muted)
                     .lineLimit(1)
                     // The end of a long name is the part that counts: the
@@ -410,14 +423,14 @@ struct LittleView: View {
                     .truncationMode(.head)
                 Spacer(minLength: 0)
                 if let keep {
-                    Pill("Open in \(Store.name)", action: keep)
+                    Pill("Open in \(Store.name)", large: roomy, action: keep)
                         .help("Open in \(Store.name)   ⌘O")
                 } else {
                     Spacer().frame(width: 64)
                 }
             }
-            .padding(.horizontal, 10)
-            .frame(height: 34)
+            .padding(.horizontal, roomy ? 12 : 10)
+            .frame(height: roomy ? LittleView.roomyBar : 34)
             ZStack {
                 WebStage(page: tab.built ?? tab.web)
                 // A page that never came says so, with Try again, as in a tab.
