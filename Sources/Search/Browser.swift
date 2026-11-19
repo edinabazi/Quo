@@ -2343,7 +2343,7 @@ final class Browser: NSObject, ObservableObject {
         } else if let open = offer.tab, let other = tabs.first(where: { $0.id == open }) {
             select(other)
         } else {
-            tab.go(to: offer.url)
+            load(offer.url, typedInto: tab)
         }
     }
 
@@ -2376,7 +2376,7 @@ final class Browser: NSObject, ObservableObject {
         editingTab = nil
         tabOffers = []
         tabPicked = nil
-        tab.go(to: url)
+        load(url, typedInto: tab)
     }
 
     func cancelTabEdit() {
@@ -3605,6 +3605,26 @@ final class Browser: NSObject, ObservableObject {
         guard let host = url.host()?.lowercased(), !host.isEmpty else { return nil }
         let name = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         return url.port.map { "\(name):\($0)" } ?? name
+    }
+
+    /// A pin keeps its site, as in Arc and Dia: an address of another site
+    /// typed into it — in its row, the address bar or ⌘L — opens in a tab
+    /// of its own, and the pin stays where it was. Its own site's pages
+    /// still load in it, and so does anything with no site to compare.
+    func typedLeavesPin(_ tab: Tab, _ url: URL) -> Bool {
+        guard tab.pin != nil, !tab.shy, let base = tab.home ?? tab.address,
+              let mine = Browser.site(of: base), let theirs = Browser.site(of: url) else { return false }
+        return mine != theirs
+    }
+
+    /// An address typed for this tab: loaded in it, or, typed into a pin
+    /// for another site, in a new tab beside it.
+    func load(_ url: URL, typedInto tab: Tab) {
+        if typedLeavesPin(tab, url) {
+            open(url, foreground: true, from: tab, loose: true)
+        } else {
+            tab.go(to: url)
+        }
     }
 
     /// The path, ending in a slash, so that /me is never taken for the start of /media.
@@ -7505,8 +7525,8 @@ final class Browser: NSObject, ObservableObject {
             // Opened behind the page by hand, as a ⌘-clicked link is: it may
             // wait to load (Settings › Tabs › Load background tabs…).
             open(url, foreground: front, from: active, mayWait: true)
-        } else {
-            (active ?? tabs.first)?.go(to: url)
+        } else if let tab = active ?? tabs.first {
+            load(url, typedInto: tab)
         }
         editing = false
         typed = ""

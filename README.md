@@ -36,6 +36,10 @@ Each list is turned into WebKit's own rules and compiled once, a few seconds for
 
 This is [driceroland/Search#738](https://github.com/driceroland/Search/pull/738) by [@oddharsh](https://github.com/oddharsh), which Search closed to stay small.
 
+### Pins keep their site
+
+An address for another site typed into a pinned tab, in its row, the address bar or ⌘L, opens in a new tab beside it, and the pin stays where it was, as in Arc and Dia. A page of the pin's own site still loads in the pin.
+
 ### Chrome's reload keys
 
 **⇧⌘R** reloads the page from the server, skipping the cache, as in Chrome. Reading Mode moves to **⌥⌘R**. Search has them the other way round, as Safari does. Both can be changed in Settings › Keyboard & Mouse.
