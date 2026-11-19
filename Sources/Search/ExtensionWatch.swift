@@ -310,5 +310,6 @@ enum ExtensionWatch {
     /// again, the ears its last worker opened are let go.
     static func workerGone(of extensionID: String) {
         for ear in open.values where ear.worker && ear.extensionID == extensionID { release(ear) }
+        ExtensionNotifications.workerGone(of: extensionID)
     }
 }

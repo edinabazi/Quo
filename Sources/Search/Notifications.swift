@@ -65,6 +65,14 @@ final class SiteNotifications: NSObject {
         let setter = NSSelectorFromString("set_delegate:")
         guard store.responds(to: setter) else { return }
         store.perform(setter, with: self)
+        listen()
+    }
+
+    /// Search hears what is done with its notifications: a site's, or an
+    /// extension's (ExtensionNotifications), whether or not a site was
+    /// ever allowed. Set as Search launches too, so the answer that
+    /// launched it isn't missed.
+    func listen() {
         if !Store.testing, UNUserNotificationCenter.current().delegate == nil {
             UNUserNotificationCenter.current().delegate = self
         }
@@ -76,8 +84,9 @@ final class SiteNotifications: NSObject {
         authorized = true
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        // Beside any an extension has set (NotificationCategories).
         let site = UNNotificationCategory(identifier: "site", actions: [], intentIdentifiers: [], options: [.customDismissAction])
-        UNUserNotificationCenter.current().setNotificationCategories([site])
+        Task { await NotificationCategories.add(site) }
     }
 
     private var on: Bool { Shared.prefs.siteNotifications }
@@ -255,7 +264,8 @@ extension SiteNotifications: UNUserNotificationCenterDelegate {
         let action = response.actionIdentifier
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                if action == UNNotificationDismissActionIdentifier { SiteNotifications.shared.closed(info) }
+                if #available(macOS 15.4, *), ExtensionNotifications.answered(info, action: action) {}
+                else if action == UNNotificationDismissActionIdentifier { SiteNotifications.shared.closed(info) }
                 else { SiteNotifications.shared.clicked(info) }
             }
             completionHandler()

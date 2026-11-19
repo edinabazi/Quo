@@ -2283,7 +2283,8 @@ enum ExtensionShims {
         };
         // Said again to a port already open (the interval changed).
         const update = () => { if (port) try { port.postMessage(hello()); } catch (e) {} };
-        return { start, stop, update, isOpen: () => !!port };
+        const say = (m) => { if (port) try { port.postMessage(m); } catch (e) {} };
+        return { start, stop, update, say, isOpen: () => !!port };
       };
       // Groups change in Search's hands, where no event reaches the
       // extension: while it listens, the browser says when they have changed
@@ -2347,6 +2348,40 @@ enum ExtensionShims {
         ["onInstalled", "onUninstalled", "onEnabled", "onDisabled"]);
       define("notifications", ["create", "update", "clear", "getAll", "getPermissionLevel"],
         ["onClicked", "onClosed", "onButtonClicked", "onPermissionLevelChanged", "onShowSettings"]);
+      // What is done with a notification on the Mac — a click, a button, a
+      // dismissal — is told by the browser on a port while anyone listens,
+      // as Chrome tells it (ExtensionNotifications.swift). A worker woken by
+      // a click hears what it missed as its port opens; the background says
+      // what it has heard, and the browser stops saying it.
+      if (chrome.notifications && chrome.notifications.onClicked && chrome.notifications.onClicked.listeners) {
+        const notes = chrome.notifications, told = ["onClicked", "onButtonClicked", "onClosed"], seen = new Set();
+        const tell = (name, args) => {
+          for (const f of [...notes[name].listeners]) try { f(...args); } catch (e) { setTimeout(() => { throw e; }); }
+        };
+        let line = null;
+        const heard = (m) => {
+          const events = Array.isArray(m.events) ? m.events : [], heardNow = [];
+          for (const e of events) {
+            if (!e || typeof e.id !== "string") continue;
+            heardNow.push(e.id);
+            if (seen.has(e.id)) continue;
+            seen.add(e.id);
+            if (e.event === "clicked") tell("onClicked", [e.key]);
+            else if (e.event === "button") tell("onButtonClicked", [e.key, e.index]);
+            else if (e.event === "closed") tell("onClosed", [e.key, !!e.byUser]);
+          }
+          if (background && heardNow.length && line) line.say({ ack: heardNow });
+        };
+        line = watching("search.notifications", () => ({ listen: true, worker }), heard);
+        for (const name of told) {
+          const { addListener: add, removeListener: remove } = notes[name];
+          notes[name].addListener = (f) => { add(f); line.start(); };
+          notes[name].removeListener = (f) => {
+            remove(f);
+            if (!told.some((n) => notes[n].listeners.size)) line.stop();
+          };
+        }
+      }
       define("tts", ["speak", "stop", "pause", "resume", "isSpeaking", "getVoices"], ["onVoicesChanged"]);
       define("identity",
         ["launchWebAuthFlow", "getAuthToken", "getProfileUserInfo", "removeCachedAuthToken", "clearAllCachedAuthTokens"],
@@ -5076,26 +5111,18 @@ enum ExtensionShims {
         case "notifications.create":
             let named = first as? String
             let options = (named == nil ? first : (args.count > 1 ? args[1] : nil)) as? [String: Any] ?? [:]
-            let key = named ?? UUID().uuidString
-            let center = UNUserNotificationCenter.current()
-            _ = try? await center.requestAuthorization(options: [.alert, .sound])
-            let content = UNMutableNotificationContent()
-            content.title = options["title"] as? String ?? (context.webExtension.displayName ?? "")
-            content.body = options["message"] as? String ?? ""
-            content.subtitle = context.webExtension.displayName ?? ""
-            try? await center.add(UNNotificationRequest(identifier: "\(id).\(key)", content: content, trigger: nil))
-            return key
+            return await ExtensionNotifications.create(named ?? UUID().uuidString, options: options, context: context)
         case "notifications.clear":
-            if let key = first as? String {
-                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["\(id).\(key)"])
-            }
+            guard let key = first as? String else { return false }
+            ExtensionNotifications.clear(key, context: context)
             return true
         case "notifications.getAll":
-            return [String: Any]()
+            return await ExtensionNotifications.all(context)
         case "notifications.getPermissionLevel":
             return "granted"
         case "notifications.update":
-            return false
+            guard let key = first as? String else { return false }
+            return await ExtensionNotifications.update(key, options: (args.count > 1 ? args[1] : nil) as? [String: Any] ?? [:], context: context)
 
         // MARK: speech
         case "tts.speak":

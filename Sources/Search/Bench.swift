@@ -1,6 +1,7 @@
 import AppKit
 import AuthenticationServices
 import SwiftUI
+import UserNotifications
 import WebKit
 
 // A way for a script on this Mac to drive the browser you already have open,
@@ -4388,7 +4389,7 @@ final class Bench {
                     "size": [Double(size.width), Double(size.height)],
                     "least": [Double(StylePanel.least.width), Double(StylePanel.least.height)]])
 
-        case "extensions", "ext-add", "ext-crx", "ext-fetches", "ext-folder", "ext-press", "ext-remove", "ext-reload", "ext-page", "ext-popup", "ext-menu", "ext-pin", "ext-shot", "ext-answer", "ext-enable", "ext-private", "ext-sites", "capture", "capture-stop":
+        case "extensions", "ext-add", "ext-crx", "ext-fetches", "ext-folder", "ext-press", "ext-remove", "ext-reload", "ext-page", "ext-popup", "ext-menu", "ext-pin", "ext-shot", "ext-answer", "ext-enable", "ext-private", "ext-sites", "ext-notifications", "capture", "capture-stop":
             guard #available(macOS 15.4, *) else {
                 answer(["error": "extensions need macOS 15.4"])
                 return
@@ -4890,6 +4891,19 @@ final class Bench {
         let extensions = Extensions.shared
         let skip = Store.testing && (request["yes"] as? Bool ?? false)
         switch verb {
+        case "ext-notifications":
+            // What extensions would have posted in a test run, and, given an
+            // extension, a key and an action ("default", "dismiss",
+            // "button.0"…), that action taken on the Mac's notification.
+            guard Store.testing else { answer(["error": "ext-notifications only works on a --test run"]); return }
+            if let id = request["extension"] as? String, let key = request["key"] as? String, let action = request["action"] as? String {
+                let actions = ["default": UNNotificationDefaultActionIdentifier, "dismiss": UNNotificationDismissActionIdentifier]
+                let taken = ExtensionNotifications.answered(["search.kind": ExtensionNotifications.kind, "search.extension": id, "search.key": key],
+                                                            action: actions[action] ?? action)
+                answer(["answered": taken, "status": ExtensionNotifications.status])
+                return
+            }
+            answer(["recorded": ExtensionNotifications.recorded, "status": ExtensionNotifications.status])
         case "extensions":
             answer(["started": extensions.started, "busy": extensions.busy.sorted(), "watching": ExtensionWatch.status, "extensions": extensions.installed.map { item -> [String: Any] in
                 let context = extensions.contexts[item.id]

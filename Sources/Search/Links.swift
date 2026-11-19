@@ -116,6 +116,8 @@ final class Links: NSObject, NSApplicationDelegate {
         // out directly: making a store happens to ask for it early on
         // macOS 15.4, but on 14 the first update check can beat it.
         MainActor.assumeIsolated { _ = BrowserProxy.shared }
+        // What is done with a notification that launched Search reaches it.
+        MainActor.assumeIsolated { SiteNotifications.shared.listen() }
         Links.watchForTrouble()
         NSAppleEventManager.shared().setEventHandler(
             self, andSelector: #selector(handle(getURL:reply:)),
