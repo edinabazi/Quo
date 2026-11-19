@@ -29,11 +29,19 @@ struct InternalPage: Equatable {
         self.detail = detail?.isEmpty == true ? nil : detail
     }
 
-    static let scheme = "search"
+    /// The app's own name, as its pages' addresses begin: quo://settings in
+    /// Quo, search://settings in Search.
+    static let scheme: String = {
+        let name = Store.name.lowercased()
+        return !name.isEmpty && name.allSatisfy({ $0.isASCII && $0.isLetter }) ? name : "search"
+    }()
+    /// What the addresses began with before, still read: a tab, a pin or a
+    /// history entry kept as search://settings opens as it always did.
+    static let schemes: Set<String> = [scheme, "search"]
 
     /// search://settings, search://settings/privacy, search://import/Arc.
     init?(url: URL) {
-        guard url.scheme?.lowercased() == InternalPage.scheme,
+        guard let scheme = url.scheme?.lowercased(), InternalPage.schemes.contains(scheme),
               let host = url.host()?.lowercased(), let kind = Kind(rawValue: host)
         else { return nil }
         let rest = url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))

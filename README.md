@@ -50,7 +50,7 @@ Quo runs beside an installed Search without sharing anything with it:
 
 | | Search | Quo |
 |---|---|---|
-| Name in the app | Search | Quo: menus, Settings, alerts, permission prompts, the AppleScript dictionary |
+| Name in the app | Search | Quo: menus, Settings, alerts, permission prompts, the AppleScript dictionary, its own pages' addresses (`quo://settings`; an old `search://` one still opens) |
 | Bundle ID | `com.officecommun.search` | `com.edinabazi.quo` |
 | Tabs, history, pins, extensions | `~/Library/Application Support/Search` | `~/Library/Application Support/Quo` |
 | Settings | `com.officecommun.search` | `com.edinabazi.quo` |
