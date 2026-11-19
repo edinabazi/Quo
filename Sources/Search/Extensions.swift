@@ -2384,7 +2384,6 @@ private struct ExtensionButtons: View {
                         extensions.press(button.id, in: browser)
                     }
                     .background(Anchor(id: button.id, browser: browser))
-                    .background(StillWindow())
                     .contextMenu { ExtensionActions(id: button.id, name: button.name, browser: browser, extensions: extensions) }
                     // The one in hand stays under the pointer; the others
                     // slide aside to make room for it.
@@ -2476,16 +2475,21 @@ private struct ExtensionButtons: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
+            // The window held still while the pointer is on the button.
+            .background(StillWindow(on: hovering))
             .help(button.label)
         }
     }
 
     /// Under each button: the window held still while the pointer is over
     /// it, so a ⌘-drag moves the button, not the window it sits in the title
-    /// bar of. Takes no clicks itself.
+    /// bar of. Takes no clicks itself, and is told of the pointer by the
+    /// button's own hover: a tracking area of its own took the hover from
+    /// the button, which then never lit up.
     private struct StillWindow: NSViewRepresentable {
-        func makeNSView(context: Context) -> NSView { Still() }
-        func updateNSView(_ view: NSView, context: Context) {}
+        let on: Bool
+        func makeNSView(context: Context) -> Still { Still() }
+        func updateNSView(_ view: Still, context: Context) { view.hold(on) }
 
         final class Still: NSView {
             private var over: NSWindow?
@@ -2493,21 +2497,12 @@ private struct ExtensionButtons: View {
             override var mouseDownCanMoveWindow: Bool { false }
             override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-            override func updateTrackingAreas() {
-                super.updateTrackingAreas()
-                for area in trackingAreas { removeTrackingArea(area) }
-                addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
-            }
-
-            override func mouseEntered(with event: NSEvent) { hold(true) }
-            override func mouseExited(with event: NSEvent) { hold(false) }
-
             override func viewWillMove(toWindow newWindow: NSWindow?) {
                 hold(false)
                 super.viewWillMove(toWindow: newWindow)
             }
 
-            private func hold(_ on: Bool) {
+            func hold(_ on: Bool) {
                 if on, over == nil, let window {
                     over = window
                     DragStrip.hold(window, true)
