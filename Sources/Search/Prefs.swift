@@ -606,6 +606,14 @@ final class Preferences: ObservableObject {
             AutoScroll.on = autoScroll
         }
     }
+    /// A mouse wheel's notches scroll smoothly, as in Chrome (SmoothWheel.swift).
+    /// On unless turned off.
+    @Published var smoothWheel: Bool {
+        didSet {
+            store.set(smoothWheel, forKey: "scroll.smoothWheel")
+            SmoothWheel.on = smoothWheel
+        }
+    }
     /// Pages bounce at their top and bottom, as in Safari, rather than stop
     /// there (see Swipe.calm). Off unless asked for.
     @Published var bounces: Bool {
@@ -1217,6 +1225,9 @@ final class Preferences: ObservableObject {
         let bouncing = store.bool(forKey: "pages.bounce")
         bounces = bouncing
         Swipe.bounces = bouncing
+        let smooth = store.object(forKey: "scroll.smoothWheel") as? Bool ?? true
+        smoothWheel = smooth
+        SmoothWheel.on = smooth
         // "pages.120" was a switch before it was three choices: on is now
         // always, an explicit off never. Never touched: On power (24 Oct
         // 2026), which changes nothing on battery.
@@ -1303,6 +1314,8 @@ final class Preferences: ObservableObject {
         take(\.cardsInFullScreen, store.bool(forKey: "layout.cardsFullScreen"))
         take(\.bounces, store.bool(forKey: "pages.bounce"))
         Swipe.bounces = bounces
+        take(\.smoothWheel, "scroll.smoothWheel", store.object(forKey: "scroll.smoothWheel") as? Bool, or: true)
+        SmoothWheel.on = smoothWheel
         take(\.glyph, "glyph", store.string(forKey: "glyph").flatMap(Glyph.init), or: .letters)
         take(\.tabsGive, store.bool(forKey: "tabs.give"))
         take(\.instantMotion, store.bool(forKey: Motion.instantKey))

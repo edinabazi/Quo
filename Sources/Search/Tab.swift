@@ -3083,8 +3083,20 @@ final class PageView: WKWebView {
         """
     }
 
+    /// A mouse wheel's notches, played out smoothly (SmoothWheel.swift).
+    private lazy var smoothWheel = SmoothWheel(view: self)
+
+    /// One of SmoothWheel's steps, straight to WebKit: a scroll in pixels
+    /// with no phase, which no swipe reads.
+    func scrollSmoothly(_ event: NSEvent) {
+        super.scrollWheel(with: event)
+    }
+
     override func scrollWheel(with event: NSEvent) {
         onTouch?()
+        if smoothWheel.take(event) { return }
+        // Fingers on the trackpad take over from a wheel still gliding.
+        if event.hasPreciseScrollingDeltas { smoothWheel.stop() }
         if event.phase == .mayBegin || event.phase == .began {
             went = false
             Swipe.calm(self)

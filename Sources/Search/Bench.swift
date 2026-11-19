@@ -2683,6 +2683,19 @@ final class Bench {
             // phases and, if asked, a glide after. Only on a SEARCH_PROBE run.
             guard Store.testing else { answer(["error": "wheel only works on a --test run"]); return }
             guard let tab = find(request, in: browser), let web = tab.built else { answer(missing(request)); return }
+            // "notch": a mouse wheel's turn instead, that many lines, as a
+            // wheel without a trackpad's pixels sends it (SmoothWheel).
+            if let lines = request["notch"] as? Double {
+                let middle = web.convert(NSPoint(x: web.bounds.midX, y: web.bounds.midY), to: nil)
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(lines), wheel2: 0, wheel3: 0)
+                else { answer(["error": "no event"]); return }
+                cg.location = CGPoint(x: middle.x, y: (NSScreen.screens.first?.frame.maxY ?? 0) - middle.y)
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 0)
+                if let event = NSEvent(cgEvent: cg) { web.scrollWheel(with: event) }
+                answer(["ok": true, "precise": NSEvent(cgEvent: cg)?.hasPreciseScrollingDeltas ?? true,
+                        "lines": NSEvent(cgEvent: cg)?.scrollingDeltaY ?? 0])
+                return
+            }
             let dx = request["dx"] as? Double ?? 0, dy = request["dy"] as? Double ?? 0
             let steps = max(2, request["steps"] as? Int ?? 10)
             let ms = max(1, request["ms"] as? Double ?? 200)
