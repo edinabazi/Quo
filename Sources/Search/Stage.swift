@@ -698,6 +698,12 @@ struct WindowSetup: NSViewRepresentable {
 /// with the title bar hidden the interface swallows the clicks a title bar
 /// would have handled, and they have to be put back.
 struct DragStrip: NSViewRepresentable {
+    /// Something else in the title bar that takes its own drags — the
+    /// extensions' buttons, ⌘-dragged along the row — holds the window still
+    /// the way a strip does, while the pointer is over it: macOS would start
+    /// moving the window before the app saw the press.
+    static func hold(_ window: NSWindow, _ on: Bool) { Strip.count(window, on) }
+
     /// How much of the leading edge belongs to the tabs. A representable is a
     /// real view sitting under everything SwiftUI draws on top of it, and a
     /// real view takes the click first — so the run the tabs occupy is refused
@@ -789,6 +795,12 @@ struct DragStrip: NSViewRepresentable {
         private func hover(_ on: Bool) {
             guard let window, on != over else { return }
             over = on
+            Strip.count(window, on)
+        }
+
+        /// One more, or one fewer, thing under the pointer that holds the
+        /// window still; movable again once there is none.
+        static func count(_ window: NSWindow, _ on: Bool) {
             let id = ObjectIdentifier(window)
             let count = max(0, (Strip.hovered[id] ?? 0) + (on ? 1 : -1))
             Strip.hovered[id] = count == 0 ? nil : count

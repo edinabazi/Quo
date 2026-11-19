@@ -1040,6 +1040,26 @@ final class Extensions: NSObject, ObservableObject {
         actionsChanged += 1
     }
 
+    /// A pinned button ⌘-dragged to a new place in the row, as icons are in
+    /// the Mac's menu bar: put right after `previous`, or right before
+    /// `next` when it went to the front. The row is the install order with
+    /// the unpinned left out, so moving in that order moves it in the row,
+    /// and the list behind the puzzle button follows.
+    func move(_ id: String, after previous: String?, before next: String?) {
+        guard let from = installed.firstIndex(where: { $0.id == id }), previous != id, next != id else { return }
+        let item = installed.remove(at: from)
+        if let previous, let at = installed.firstIndex(where: { $0.id == previous }) {
+            installed.insert(item, at: at + 1)
+        } else if let next, let at = installed.firstIndex(where: { $0.id == next }) {
+            installed.insert(item, at: at)
+        } else {
+            installed.insert(item, at: from)
+            return
+        }
+        save()
+        actionsChanged += 1
+    }
+
     /// Reads what was unpacked, asks, and — on yes — moves it into place and
     /// loads it. On no, nothing is left behind.
     private func admit(_ staged: URL, as id: String, fromStore: Bool, finalFolder: URL, confirm: Bool = true, source: URL? = nil) async throws {
@@ -2333,13 +2353,41 @@ private struct ExtensionButtons: View {
     var room: Int?
     var side: CGFloat = 26
 
+    /// A button being ⌘-dragged along the row, as in the Mac's menu bar: its
+    /// id, where it started, and how far the pointer has gone. Without ⌘ a
+    /// drag does nothing, so a click that wobbles is still a click.
+    @State private var dragging: String?
+    @State private var from = 0
+    @State private var travel: CGFloat = 0
+    /// A drag that began without ⌘: left alone until the button is let go.
+    @State private var ignoring = false
+    /// The mouse-up that ends a drag lands on the button it dragged; that
+    /// isn't a press.
+    @State private var dropped = Date.distantPast
+
+    private var step: CGFloat { side + 2 }
+
     var body: some View {
         if !extensions.installed.isEmpty {
+            let shown = Array(extensions.buttons.filter(\.pinned).prefix(room ?? .max))
+            let to = target(in: shown.count)
+            let row = reordered(shown, to: to)
             HStack(spacing: 2) {
-                ForEach(extensions.buttons.filter(\.pinned).prefix(room ?? .max)) { button in
-                    ActionButton(button: button, side: side) { extensions.press(button.id, in: browser) }
-                        .background(Anchor(id: button.id, browser: browser))
-                        .contextMenu { ExtensionActions(id: button.id, name: button.name, browser: browser, extensions: extensions) }
+                ForEach(row) { button in
+                    let moving = button.id == dragging
+                    ActionButton(button: button, side: side) {
+                        guard Date().timeIntervalSince(dropped) > 0.3 else { return }
+                        extensions.press(button.id, in: browser)
+                    }
+                    .background(Anchor(id: button.id, browser: browser))
+                    .background(StillWindow())
+                    .contextMenu { ExtensionActions(id: button.id, name: button.name, browser: browser, extensions: extensions) }
+                    // The one in hand stays under the pointer; the others
+                    // slide aside to make room for it.
+                    .offset(x: moving ? travel - CGFloat(to - from) * step : 0)
+                    .zIndex(moving ? 1 : 0)
+                    .scaleEffect(moving ? 1.08 : 1)
+                    .simultaneousGesture(drag(button.id, in: shown))
                 }
                 let key = Extensions.menuKey(browser)
                 Door(icon: "puzzlepiece.extension", on: extensions.menuOwner == key, help: "Extensions", side: side) {
@@ -2354,7 +2402,55 @@ private struct ExtensionButtons: View {
                     ExtensionMenu(browser: browser, extensions: extensions)
                 }
             }
+            .animation(.snappy(duration: 0.18), value: to)
         }
+    }
+
+    /// The place the button in hand would land, from how far it has gone.
+    private func target(in count: Int) -> Int {
+        guard dragging != nil, count > 0 else { return from }
+        return min(max(from + Int((travel / step).rounded()), 0), count - 1)
+    }
+
+    /// The row as it would be with the button in hand let go where it is.
+    private func reordered(_ shown: [Extensions.Button], to: Int) -> [Extensions.Button] {
+        guard let dragging, let at = shown.firstIndex(where: { $0.id == dragging }), at != to else { return shown }
+        var row = shown
+        row.insert(row.remove(at: at), at: to)
+        return row
+    }
+
+    private func drag(_ id: String, in shown: [Extensions.Button]) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .global)
+            .onChanged { value in
+                if dragging == nil, !ignoring {
+                    guard NSEvent.modifierFlags.contains(.command),
+                          let at = shown.firstIndex(where: { $0.id == id }) else { ignoring = true; return }
+                    from = at
+                    dragging = id
+                }
+                guard dragging == id else { return }
+                travel = value.translation.width
+            }
+            .onEnded { _ in
+                defer { ignoring = false }
+                guard dragging == id else { return }
+                let to = target(in: shown.count)
+                let row = reordered(shown, to: to)
+                if to != from {
+                    extensions.move(id, after: to > 0 ? row[to - 1].id : nil,
+                                    before: to + 1 < row.count ? row[to + 1].id : nil)
+                }
+                dropped = Date()
+                // Let go without a jump: the saved order and the end of the
+                // drag land in the same frame.
+                var quiet = Transaction()
+                quiet.disablesAnimations = true
+                withTransaction(quiet) {
+                    dragging = nil
+                    travel = 0
+                }
+            }
     }
 
     private struct ActionButton: View {
@@ -2377,6 +2473,45 @@ private struct ExtensionButtons: View {
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
             .help(button.label)
+        }
+    }
+
+    /// Under each button: the window held still while the pointer is over
+    /// it, so a ⌘-drag moves the button, not the window it sits in the title
+    /// bar of. Takes no clicks itself.
+    private struct StillWindow: NSViewRepresentable {
+        func makeNSView(context: Context) -> NSView { Still() }
+        func updateNSView(_ view: NSView, context: Context) {}
+
+        final class Still: NSView {
+            private var over: NSWindow?
+
+            override var mouseDownCanMoveWindow: Bool { false }
+            override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+            override func updateTrackingAreas() {
+                super.updateTrackingAreas()
+                for area in trackingAreas { removeTrackingArea(area) }
+                addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+            }
+
+            override func mouseEntered(with event: NSEvent) { hold(true) }
+            override func mouseExited(with event: NSEvent) { hold(false) }
+
+            override func viewWillMove(toWindow newWindow: NSWindow?) {
+                hold(false)
+                super.viewWillMove(toWindow: newWindow)
+            }
+
+            private func hold(_ on: Bool) {
+                if on, over == nil, let window {
+                    over = window
+                    DragStrip.hold(window, true)
+                } else if !on, let window = over {
+                    over = nil
+                    DragStrip.hold(window, false)
+                }
+            }
         }
     }
 
