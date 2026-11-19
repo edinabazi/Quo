@@ -21,14 +21,17 @@ struct ExtensionsPage: View {
         @ObservedObject var browser: Browser
         @ObservedObject var extensions: Extensions
         @State private var link = ""
+        /// Appearance › Size is Roomy: more room, larger words, as the rest
+        /// of Settings has.
+        @Environment(\.roomySettings) private var roomy
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: roomy ? 26 : 18) {
                 Card {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: roomy ? 13 : 10) {
                         HStack(spacing: 8) {
                             Text("Add from the Chrome Web Store")
-                                .font(.system(size: 13))
+                                .font(.system(size: roomy ? 14 : 13))
                                 .foregroundStyle(Palette.ink)
                             Spacer(minLength: 8)
                             Pill("Open the Store") {
@@ -46,9 +49,9 @@ struct ExtensionsPage: View {
                                     .foregroundStyle(Palette.ink)
                                     .onSubmit(add)
                             }
-                            .font(.system(size: 12.5))
+                            .font(.system(size: roomy ? 13.5 : 12.5))
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
+                            .padding(.vertical, roomy ? 9 : 7)
                             .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                             if !extensions.busy.isEmpty {
                                 Ring(size: 12)
@@ -58,11 +61,12 @@ struct ExtensionsPage: View {
                             }
                         }
                         Text("Or find it in the store and press Add to \(Store.name) on its page.")
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(14)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, roomy ? 18 : 14)
                 }
 
                 Card {
@@ -84,7 +88,7 @@ struct ExtensionsPage: View {
                         }
                     }
                     Text("Each extension stays out of private tabs until you allow it in its … menu. One you allow can tell which tabs are private, but may still keep what you visit in them.")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -133,6 +137,8 @@ struct ExtensionsPage: View {
         let item: Installed
         @ObservedObject var extensions: Extensions
         @State private var hovering = false
+        @Environment(\.roomySettings) private var roomy
+        private var iconSide: CGFloat { roomy ? 26 : 22 }
 
         var body: some View {
             let context = extensions.contexts[item.id]
@@ -146,14 +152,14 @@ struct ExtensionsPage: View {
                             Image(systemName: "puzzlepiece.extension").foregroundStyle(Palette.muted)
                         }
                     }
-                    .frame(width: 22, height: 22)
-                    VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: iconSide, height: iconSide)
+                    VStack(alignment: .leading, spacing: roomy ? 3 : 2) {
                         Text(item.name)
-                            .font(.system(size: 13))
+                            .font(.system(size: roomy ? 14 : 13))
                             .foregroundStyle(Palette.ink)
                             .lineLimit(1)
                         Text(detail(context))
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .lineLimit(1)
                             .help(item.source ?? "")
@@ -181,12 +187,12 @@ struct ExtensionsPage: View {
                 }
                 if sites, extensions.siteAccess(item.id).restricted {
                     SiteList(item: item, extensions: extensions)
-                        .padding(.leading, 34)
-                        .padding(.top, 8)
+                        .padding(.leading, iconSide + 12)
+                        .padding(.top, roomy ? 10 : 8)
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, roomy ? 14 : 10)
             .background(hovering ? Palette.hover : .clear)
             .onHover { hovering = $0 }
             .contextMenu { actions(context) }

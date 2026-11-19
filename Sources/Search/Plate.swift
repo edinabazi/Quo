@@ -154,6 +154,8 @@ struct Line<Control: View>: View {
     let title: String
     let detail: String?
     @ViewBuilder let control: () -> Control
+    /// In Settings with Appearance › Size on Roomy: taller, larger words.
+    @Environment(\.roomySettings) private var roomy
 
     init(_ title: String, _ detail: String? = nil, @ViewBuilder control: @escaping () -> Control) {
         self.title = title
@@ -165,11 +167,11 @@ struct Line<Control: View>: View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 13))
+                    .font(.system(size: roomy ? 14 : 13))
                     .foregroundStyle(Palette.ink)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -179,7 +181,7 @@ struct Line<Control: View>: View {
             control()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.vertical, roomy ? 14 : 11)
     }
 }
 
@@ -234,10 +236,11 @@ struct Hunt: View {
 /// What a panel says when its list is empty.
 struct Nothing: View {
     let text: String
+    @Environment(\.roomySettings) private var roomy
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text)
-            .font(.system(size: 13))
+            .font(.system(size: roomy ? 14 : 13))
             .foregroundStyle(Palette.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
