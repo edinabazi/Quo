@@ -78,6 +78,35 @@ final class FilterLists: ObservableObject {
         return nil
     }
 
+    /// Lists offered under Filter lists with one click, each one the
+    /// address you'd otherwise paste. All compile well under WebKit's limit.
+    struct Suggestion: Identifiable {
+        let origin: String
+        let name: String
+        let what: String
+        /// A list this one already holds, offered only while this isn't added.
+        var within: String? = nil
+        var id: String { origin }
+    }
+
+    static let suggested: [Suggestion] = [
+        Suggestion(origin: "https://easylist.to/easylist/easylist.txt",
+                   name: "EasyList", what: "Ads, the list most blockers start from"),
+        Suggestion(origin: "https://easylist.to/easylist/easyprivacy.txt",
+                   name: "EasyPrivacy", what: "Trackers and analytics"),
+        Suggestion(origin: "https://secure.fanboy.co.nz/fanboy-annoyance.txt",
+                   name: "Fanboy's Annoyances", what: "Cookie notices, newsletter pop-ups, chat and social widgets"),
+        Suggestion(origin: "https://secure.fanboy.co.nz/fanboy-cookiemonster.txt",
+                   name: "EasyList Cookie List", what: "Only the cookie notices",
+                   within: "https://secure.fanboy.co.nz/fanboy-annoyance.txt"),
+    ]
+
+    /// The suggestions not added yet, nor held by one that is.
+    var suggestions: [Suggestion] {
+        let added = Set(sources.map(\.origin))
+        return FilterLists.suggested.filter { !added.contains($0.origin) && !added.contains($0.within ?? "") }
+    }
+
     func add(_ typed: String) {
         guard problem(with: typed) == nil, let origin = FilterLists.origin(typed) else { return }
         // Until the list's own `! Title:` says otherwise.

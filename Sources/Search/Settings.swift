@@ -1676,6 +1676,37 @@ private struct FilterListRows: View {
             FilterListRow(source: source, working: lists.working.contains(source.id), lists: lists)
                 .padding(.bottom, 6)
         }
+        let suggestions = lists.suggestions
+        if !suggestions.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(lists.sources.isEmpty ? "Popular lists" : "More lists")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
+                ForEach(suggestions) { suggestion in
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.name)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Palette.ink)
+                            Text(suggestion.what)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Palette.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .help(suggestion.origin)
+                        Spacer(minLength: 8)
+                        Pill("Add") { lists.add(suggestion.origin) }
+                            .accessibilityLabel("Add \(suggestion.name)")
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                }
+            }
+            .padding(.bottom, 6)
+        }
     }
 }
 
