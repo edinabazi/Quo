@@ -12,7 +12,7 @@ Short, and quick to type: Q-U-O rolls across the top row of the keyboard.
 
 ### An address bar above the page
 
-Off by default. Turn it on in **Settings › Tabs › Address bar above the page**. It only applies with the tabs down the side.
+On for a new install, along with the tabs down the side and Roomier tabs. Switch it in **Settings › Tabs › Address bar above the page**. It only applies with the tabs down the side. A Quo that ran before this keeps what it had.
 
 - **The whole address, always.** The site in ink, the path and query dimmed after it, as Chrome and Dia show it. "Not secure" and look-alike domains still show, exactly as in the tab.
 - **Back, forward and reload** move from the top of the column into the bar.
@@ -23,7 +23,7 @@ Off by default. Turn it on in **Settings › Tabs › Address bar above the page
 
 ### Roomier tabs, everywhere
 
-With **Settings › Tabs › Roomier tabs** on, the rest of the chrome follows the taller rows: the address bar's field is as tall as a tab, its buttons are larger, and the ⌘T / ⌘L field and its suggestions are a size up.
+On for a new install. With **Settings › Tabs › Roomier tabs** on, the rest of the chrome follows the taller rows: the address bar's field is as tall as a tab, its buttons are larger, and the ⌘T / ⌘L field and its suggestions are a size up.
 
 ### Filter lists for the built-in blocker
 

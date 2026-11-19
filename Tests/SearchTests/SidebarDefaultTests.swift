@@ -91,4 +91,49 @@ final class SidebarDefaultTests: XCTestCase {
         try Data("{}".utf8).write(to: folder.appendingPathComponent("session.json"))
         XCTAssertTrue(SidebarDefault.ranBefore(in: folder))
     }
+    // MARK: - Roomier tabs and the address bar, on for a fresh install too
+
+    private func on(_ key: String, testing: Bool = false, ranBefore: Bool = false) -> Bool {
+        SidebarDefault.settleFresh(key, store, testing: testing, ranBefore: ranBefore)
+        return SidebarDefault.onWhenFresh(key, store, testing: testing)
+    }
+
+    func testFreshInstallGetsThemOnAndWritesNoLine() {
+        for key in SidebarDefault.onWhenFresh {
+            store.removePersistentDomain(forName: suite)
+            XCTAssertTrue(on(key), key)
+            XCTAssertNil(store.object(forKey: key), key)
+            // Its second launch, having run: still on.
+            store.set(true, forKey: "welcomed")
+            XCTAssertTrue(on(key, ranBefore: true), key)
+        }
+    }
+
+    func testExistingInstallWithNoLineKeepsThemOff() {
+        for key in SidebarDefault.onWhenFresh {
+            store.removePersistentDomain(forName: suite)
+            // Settled for the sidebar by an earlier build, and run before.
+            store.set(true, forKey: SidebarDefault.settledKey)
+            store.set(true, forKey: "welcomed")
+            XCTAssertFalse(on(key, ranBefore: true), key)
+            XCTAssertEqual(store.object(forKey: key) as? Bool, false, key)
+            XCTAssertFalse(on(key, ranBefore: true), key)
+        }
+    }
+
+    func testAChoiceAlreadyMadeIsKept() {
+        for key in SidebarDefault.onWhenFresh {
+            store.removePersistentDomain(forName: suite)
+            store.set(true, forKey: "welcomed")
+            store.set(true, forKey: key)
+            XCTAssertTrue(on(key, ranBefore: true), key)
+        }
+    }
+
+    func testTestWorldsLeaveThemOff() {
+        for key in SidebarDefault.onWhenFresh {
+            XCTAssertFalse(on(key, testing: true), key)
+            XCTAssertNil(store.object(forKey: key), key)
+        }
+    }
 }

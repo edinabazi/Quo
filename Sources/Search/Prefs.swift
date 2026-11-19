@@ -138,6 +138,28 @@ enum SidebarDefault {
         }
     }
 
+    /// Settings on for a fresh install of Quo: Roomier tabs and the address
+    /// bar above the page. The same one time as the sidebar above, with a
+    /// line of its own for each, since installs that had settled that one
+    /// before this build must still be asked: one that ran before, with no
+    /// line for a setting, had it off, and keeps it off.
+    static let onWhenFresh = ["sidebar.roomy", "sidebar.addressBar"]
+
+    static func settleFresh(_ key: String, _ store: UserDefaults, testing: Bool, ranBefore: Bool) {
+        let settled = key + ".settled"
+        guard !store.bool(forKey: settled) else { return }
+        store.set(true, forKey: settled)
+        guard fresh(testing: testing), store.object(forKey: key) == nil else { return }
+        if ranBefore || traces.contains(where: { store.object(forKey: $0) != nil }) {
+            store.set(false, forKey: key)
+        }
+    }
+
+    /// What such a setting reads as: its line, or on for a fresh install.
+    static func onWhenFresh(_ key: String, _ store: UserDefaults, testing: Bool) -> Bool {
+        store.object(forKey: key) as? Bool ?? fresh(testing: testing)
+    }
+
     /// Whether this folder holds what a Search that has run leaves there.
     static func ranBefore(in folder: URL) -> Bool {
         ["session.json", "windows.json", "pins.json"].contains {
@@ -979,8 +1001,14 @@ final class Preferences: ObservableObject {
 
     init() {
         Preferences.settleLittleLinks(in: store)
+        // Settled before anything below reads the lines they write.
+        let ranBefore = SidebarDefault.ranBefore(in: Store.folder)
+        SidebarDefault.settle(store, testing: Store.testing, ranBefore: ranBefore)
+        for key in SidebarDefault.onWhenFresh {
+            SidebarDefault.settleFresh(key, store, testing: Store.testing, ranBefore: ranBefore)
+        }
         navigationLeft = store.bool(forKey: "toolbar.left")
-        addressBar = store.bool(forKey: "sidebar.addressBar")
+        addressBar = SidebarDefault.onWhenFresh("sidebar.addressBar", store, testing: Store.testing)
         compactStrip = store.bool(forKey: "tabs.compact")
         // Carried over from when there were four ways of holding the browser
         // and this was one of them.
@@ -1009,14 +1037,13 @@ final class Preferences: ObservableObject {
         NSApplication.shared.appearance = chosen.appearance
         sidePanelWidth = min(max(CGFloat(store.object(forKey: "sidepanel.width") as? Double ?? 380),
                                  Preferences.sidePanelWidths.lowerBound), Preferences.sidePanelWidths.upperBound)
-        SidebarDefault.settle(store, testing: Store.testing, ranBefore: SidebarDefault.ranBefore(in: Store.folder))
         sidebar = store.object(forKey: "sidebar") as? Bool
             ?? store.string(forKey: "manner").map { $0 == "side" }
             ?? SidebarDefault.fresh(testing: Store.testing)
         sidePosition = store.string(forKey: "sidebar.position").flatMap(SidebarPosition.init) ?? .left
         sideHides = store.bool(forKey: "sidebar.hides")
         slidesColumn = store.bool(forKey: Motion.slidesKey)
-        roomyTabs = store.bool(forKey: "sidebar.roomy")
+        roomyTabs = SidebarDefault.onWhenFresh("sidebar.roomy", store, testing: Store.testing)
         sideIcons = store.bool(forKey: "sidebar.icons")
         foldsToIcons = store.bool(forKey: "sidebar.foldIcons")
         showsPlayer = store.bool(forKey: "sidebar.player")
@@ -1257,7 +1284,7 @@ final class Preferences: ObservableObject {
     func reread() {
         take(\.look, "look", store.string(forKey: "look").flatMap(Look.init), or: .system)
         take(\.navigationLeft, store.bool(forKey: "toolbar.left"))
-        take(\.addressBar, store.bool(forKey: "sidebar.addressBar"))
+        take(\.addressBar, SidebarDefault.onWhenFresh("sidebar.addressBar", store, testing: Store.testing))
         take(\.compactStrip, store.bool(forKey: "tabs.compact"))
         take(\.sidebar, "sidebar", store.object(forKey: "sidebar") as? Bool,
              or: store.string(forKey: "manner").map { $0 == "side" } ?? SidebarDefault.fresh(testing: Store.testing))
@@ -1265,7 +1292,7 @@ final class Preferences: ObservableObject {
              or: .left)
         take(\.sideHides, store.bool(forKey: "sidebar.hides"))
         take(\.slidesColumn, store.bool(forKey: Motion.slidesKey))
-        take(\.roomyTabs, store.bool(forKey: "sidebar.roomy"))
+        take(\.roomyTabs, SidebarDefault.onWhenFresh("sidebar.roomy", store, testing: Store.testing))
         take(\.sideIcons, store.bool(forKey: "sidebar.icons"))
         take(\.foldsToIcons, store.bool(forKey: "sidebar.foldIcons"))
         take(\.sideWidth, "sidebar.width", (store.object(forKey: "sidebar.width") as? Double).map { CGFloat($0) }
