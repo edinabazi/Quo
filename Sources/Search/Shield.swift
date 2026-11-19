@@ -26,6 +26,13 @@ final class Shield: ObservableObject {
     private var waiting: [WKUserContentController] = []
     private var preparing = false
 
+    /// The filter lists added in Settings › Privacy, compiled by FilterLists.
+    /// They go on and off with this list, and pause with it on a site.
+    private(set) var added: [WKContentRuleList] = []
+
+    /// Every list a page gets while the blocker is on.
+    private var all: [WKContentRuleList] { (list.map { [$0] } ?? []) + added }
+
     /// Set the one time compiling the list didn't work. The toggle in
     /// Settings can say "on" all it wants; nothing is actually blocked until
     /// this is nil, so it is the one thing worth telling a person about
@@ -59,22 +66,49 @@ final class Shield: ObservableObject {
     /// doing this at the navigation is what makes "off for this site" true
     /// for the whole page rather than for the second half of it.
     func tune(_ controller: WKUserContentController, for host: String?) {
-        guard list != nil else { return }
+        guard !all.isEmpty else { return }
         set(controller, on: enabled && !isPaused(on: host))
     }
 
-    /// Whether each page's controller has the list, as it was last given or
+    /// Whether each page's controller has the lists, as it was last given or
     /// taken: one heading to another page with Shield on, as before, is left
-    /// as it is, rather than the list taken out and put back — sent to the
+    /// as it is, rather than the lists taken out and put back — sent to the
     /// page's process both ways — on every link followed.
     private let holding = NSMapTable<WKUserContentController, NSNumber>.weakToStrongObjects()
 
     private func set(_ controller: WKUserContentController, on: Bool, again: Bool = false) {
-        guard let list else { return }
+        guard !all.isEmpty else { return }
         if !again, holding.object(forKey: controller)?.boolValue == on { return }
-        controller.remove(list)
-        if on { controller.add(list) }
+        all.forEach(controller.remove)
+        if on { all.forEach(controller.add) }
         holding.setObject(NSNumber(value: on), forKey: controller)
+    }
+
+    /// The added lists changed — one added, updated, switched off. Off every
+    /// open page the old ones were on, and the new ones on, minding the sites
+    /// the blocker is paused for: a site turned off because it broke stays
+    /// off while a list updates under it.
+    func use(_ lists: [WKContentRuleList]) {
+        let old = added
+        added = lists
+        for web in Shield.everyPage {
+            let controller = web.configuration.userContentController
+            old.forEach(controller.remove)
+            set(controller, on: enabled && !isPaused(on: Shield.host(of: web.url)), again: true)
+        }
+    }
+
+    /// Every page open: each window's tabs, in every space, and the small
+    /// windows'.
+    static var everyPage: [WKWebView] {
+        let tabs = Browsers.all.flatMap { $0.tabs + $0.parked.values.flatMap(\.tabs) } + LittleWindow.all.map(\.tab)
+        return tabs.compactMap(\.built)
+    }
+
+    /// A site as `pause` keys it, as Curtain does: without `www.`.
+    static func host(of url: URL?) -> String? {
+        guard let host = url?.host()?.lowercased() else { return nil }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
     /// Third parties whose only job is to watch or to sell. First-party
@@ -212,12 +246,14 @@ final class Shield: ObservableObject {
             if enabled { set(controller, on: true, again: true) }
         } else {
             waiting.append(controller)
+            // Until the built-in list is ready, the added ones go on alone;
+            // `ready` puts them all on together.
+            if enabled { added.forEach(controller.add) }
         }
     }
 
     /// Switched on or off for every page that is already open.
     func apply(to controllers: [WKUserContentController]) {
-        guard list != nil else { return }
         for controller in controllers { set(controller, on: enabled, again: true) }
     }
 }

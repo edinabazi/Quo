@@ -25,6 +25,17 @@ Off by default. Turn it on in **Settings › Tabs › Address bar above the page
 
 With **Settings › Tabs › Roomier tabs** on, the rest of the chrome follows the taller rows: the address bar's field is as tall as a tab, its buttons are larger, and the ⌘T / ⌘L field and its suggestions are a size up.
 
+### Filter lists for the built-in blocker
+
+Search's blocker is a short hand-written list. Quo's can also take the lists every other blocker uses: **Settings › Privacy › Filter lists › Add…**, then an address or a file. Good ones to start with:
+
+- `https://easylist.to/easylist/easylist.txt` (ads)
+- `https://easylist.to/easylist/easyprivacy.txt` (trackers)
+
+Each list is turned into WebKit's own rules and compiled once, a few seconds for a big one, then loads instantly at launch. It updates as often as the list asks. The site card's switch turns them off for one site along with the rest of the blocker. What WebKit's rules can't express (scriptlets, redirects, `:has-text()` and the like) is skipped and counted on the list's row. So a page that fights ad blockers can still get its way where uBlock Origin Lite's scriptlets would stop it.
+
+This is [driceroland/Search#738](https://github.com/driceroland/Search/pull/738) by [@oddharsh](https://github.com/oddharsh), which Search closed to stay small.
+
 ### Its own app
 
 Quo runs beside an installed Search without sharing anything with it:
@@ -96,4 +107,4 @@ How Search is put together (one file per concern in `Sources/Search/`, the `./be
 
 ## License
 
-MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun. Quo has its own icon, a white Q cut from a black tile (`Icon/quo-mark.svg`, set in Inter Tight, OFL); the logo inside Settings › About and the welcome screen is still Search's for now.
+MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun. Quo has its own icon, a white Q cut from a black tile (`Icon/quo-mark.svg`, set in Inter Tight, OFL); the logo inside Settings › About and the welcome screen is still Search's for now. `Sources/Search/FilterList.swift` is a port of [adblock-rust](https://github.com/brave/adblock-rust) and stays under its licence, the Mozilla Public License 2.0.
