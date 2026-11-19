@@ -190,7 +190,7 @@ struct StopAgentMenuItem: View {
 enum AgentWords {
     @MainActor
     static func line(_ session: AgentSession) -> String {
-        session.busy ? "\(session.client) is using Search" : "\(session.client), idle"
+        session.busy ? "\(session.client) is using \(Store.name)" : "\(session.client), idle"
     }
 
     /// Said for a few seconds once let in without asking.
@@ -218,7 +218,7 @@ private struct AgentQuestion: View {
                     .foregroundStyle(Palette.muted)
                     .padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("“\(session.client)” wants to use Search")
+                    Text("“\(session.client)” wants to use \(Store.name)")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(Palette.ink)
                     Text(detail)

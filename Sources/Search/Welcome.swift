@@ -168,12 +168,12 @@ struct WelcomePanel: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark")
                             .font(.system(size: 11, weight: .medium))
-                        Text("Search is the default browser")
+                        Text("\(Store.name) is the default browser")
                     }
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.ink)
                 } else {
-                    Big("Make Search the default", filled: true) {
+                    Big("Make \(Store.name) the default", filled: true) {
                         asked = true
                         Links.becomeDefault { _ in isDefault = Links.isDefault }
                     }
@@ -202,9 +202,9 @@ struct WelcomePanel: View {
                 Key("⌘L", "Suggestions from your search engine as you type — off until you turn them on in Settings › Browsing.")
                 Key("⌘", "Held, it can show each tab's number for ⌘1–9. Settings › Tabs.")
                 Key("⌘1", "Pressed again on its pin, back to where you were.")
-                Key("⇧⌘P", "Float a video in Search's window, or in macOS's picture in picture. Settings › Browsing.")
+                Key("⇧⌘P", "Float a video in \(Store.name)'s window, or in macOS's picture in picture. Settings › Browsing.")
                 Key("⌃-click", "Claude or ChatGPT in a side panel beside the page: right-click a tab › Open in Side Panel, or View › Side Panel.")
-                Key("⌘Q", "Search can ask before it quits. Settings › General.")
+                Key("⌘Q", "\(Store.name) can ask before it quits. Settings › General.")
                 Key("⌘,", "Your Apple passwords, under the sign-in field — Settings › Passwords.")
                 if PageTranslator.available {
                     Key("⌃-click", "Translate a page into your language, on this Mac — nothing is sent anywhere. Right-click the page › Translate Page.")

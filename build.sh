@@ -129,7 +129,9 @@ vtool -set-build-version macos "$MINIMUM" "$SDK" -replace \
 mv "$APP/Contents/MacOS/$NAME.sdk" "$APP/Contents/MacOS/$NAME"
 # The AppleScript dictionary (Scripting.swift): read-only, tabs' addresses
 # and titles. The plist below points to it.
-cp Search.sdef "$APP/Contents/Resources/"
+# Under a fork's own name, so Script Editor lists it as the app it is.
+sed -e "s/Search Terminology/$NAME Terminology/" -e "s/Search Suite/$NAME Suite/" \
+    -e "s/description=\"Search\.\"/description=\"$NAME.\"/" Search.sdef > "$APP/Contents/Resources/Search.sdef"
 
 # Symbols stay out of the app. The linker leaves every function's name and a
 # map back to the source in the binary — 15,000 entries, more than half of
@@ -179,6 +181,9 @@ else
 fi
 rm -rf "$ICONCAR" "$ICONDOC"
 
+# A fork keeps the credit: it is Office Commun's work under another name.
+if [ "$NAME" = "Search" ]; then COPYRIGHT="© Office Commun · Search"; else COPYRIGHT="$NAME, a fork of Search © Office Commun"; fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -197,7 +202,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   $ICONNAME
   <key>LSMinimumSystemVersion</key><string>$MINIMUM</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
-  <key>NSHumanReadableCopyright</key><string>© Office Commun · Search</string>
+  <key>NSHumanReadableCopyright</key><string>$COPYRIGHT</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppleScriptEnabled</key><true/>
   <key>OSAScriptingDefinition</key><string>Search.sdef</string>
@@ -261,22 +266,22 @@ cat > "$APP/Contents/Info.plist" <<PLIST
        still wants a sentence to put in its own prompt, and touching the APIs
        without one is a crash rather than a refusal. -->
   <key>NSCameraUsageDescription</key>
-  <string>Websites you visit can ask to use your camera. Search asks you the first time each site does and keeps your answer; Settings › Privacy forgets them.</string>
+  <string>Websites you visit can ask to use your camera. $NAME asks you the first time each site does and keeps your answer; Settings › Privacy forgets them.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Websites you visit can ask to use your microphone. Search asks you the first time each site does and keeps your answer; Settings › Privacy forgets them.</string>
+  <string>Websites you visit can ask to use your microphone. $NAME asks you the first time each site does and keeps your answer; Settings › Privacy forgets them.</string>
   <!-- Location: the first key is the one macOS has always read; the second
        is the one CoreLocation's requestWhenInUseAuthorization documents.
        Same sentence in both. -->
   <key>NSLocationUsageDescription</key>
-  <string>Websites you visit can ask for your location. Search asks you each time a site does, unless you choose Always allow for it; Settings › Privacy forgets those choices.</string>
+  <string>Websites you visit can ask for your location. $NAME asks you each time a site does, unless you choose Always allow for it; Settings › Privacy forgets those choices.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
-  <string>Websites you visit can ask for your location. Search asks you each time a site does, unless you choose Always allow for it; Settings › Privacy forgets those choices.</string>
+  <string>Websites you visit can ask for your location. $NAME asks you each time a site does, unless you choose Always allow for it; Settings › Privacy forgets those choices.</string>
   <key>NSDownloadsFolderUsageDescription</key>
   <string>Files you download are saved to your Downloads folder.</string>
   <!-- Only once you turn on Settings › Passwords › Fill in your contact
        details: your own card, never anyone else's (MeCard.swift). -->
   <key>NSContactsUsageDescription</key>
-  <string>Search fills in forms with the details on your own card in Contacts, once you pick them under a box. It reads no one else's card and saves no copy of yours.</string>
+  <string>$NAME fills in forms with the details on your own card in Contacts, once you pick them under a box. It reads no one else's card and saves no copy of yours.</string>
 </dict>
 </plist>
 PLIST

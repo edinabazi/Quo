@@ -98,7 +98,7 @@ struct AgentLauncher: Equatable {
         guard signed else { return "\(called), which started it, isn't signed" }
         guard !adhoc, !team.isEmpty else { return "\(called), which started it, isn't signed by a named developer" }
         guard let expected = allowed[identifier], expected == team else {
-            return "it was started by \(called), which isn't an agent's own program Search knows"
+            return "it was started by \(called), which isn't an agent's own program \(Store.name) knows"
         }
         return nil
     }

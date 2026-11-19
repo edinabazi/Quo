@@ -163,7 +163,7 @@ final class Sync: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.message = "Choose a folder your Macs share, in iCloud Drive or Dropbox for example. Turn on sync with the same folder in Search on each Mac."
+        panel.message = "Choose a folder your Macs share, in iCloud Drive or Dropbox for example. Turn on sync with the same folder in \(Store.name) on each Mac."
         panel.prompt = "Sync Here"
         let drive = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
@@ -281,7 +281,7 @@ final class Sync: ObservableObject {
         do {
             try files.createDirectory(at: folder, withIntermediateDirectories: true)
         } catch {
-            problem = "Search can\u{2019}t write in that folder"
+            problem = "\(Store.name) can\u{2019}t write in that folder"
             return []
         }
         problem = nil

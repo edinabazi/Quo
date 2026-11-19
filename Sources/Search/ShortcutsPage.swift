@@ -59,7 +59,7 @@ struct ShortcutsPage: View {
                 let numbered = section == .tabs && numbers
                 if !commands.isEmpty || numbered {
                 VStack(alignment: .leading, spacing: 6) {
-                    Caption(section.rawValue)
+                    Caption(section == .app ? Store.name : section.rawValue)
                     Card {
                         ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
                             if index > 0 { Rule() }

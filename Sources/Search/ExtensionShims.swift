@@ -4920,7 +4920,7 @@ enum ExtensionShims {
         case "downloads.erase":
             return []
         case "downloads.pause", "downloads.resume", "downloads.cancel", "downloads.removeFile", "downloads.getFileIcon":
-            throw Unsupported(what: "\(api) isn't available in Search yet")
+            throw Unsupported(what: "\(api) isn't available in \(Store.name) yet")
 
         // MARK: side panel — the window's, beside the page (SidePanel.swift)
         case "sidePanel.setOptions":
@@ -5397,7 +5397,7 @@ enum ExtensionShims {
             if let old = awake[id] { IOPMAssertionRelease(old) }
             var assertion: IOPMAssertionID = 0
             let kind = (display ? kIOPMAssertionTypePreventUserIdleDisplaySleep : kIOPMAssertionTypePreventUserIdleSystemSleep) as CFString
-            if IOPMAssertionCreateWithName(kind, IOPMAssertionLevel(kIOPMAssertionLevelOn), "An extension in Search" as CFString, &assertion) == kIOReturnSuccess {
+            if IOPMAssertionCreateWithName(kind, IOPMAssertionLevel(kIOPMAssertionLevelOn), "An extension in \(Store.name)" as CFString, &assertion) == kIOReturnSuccess {
                 awake[id] = assertion
             }
             return nil
@@ -5406,7 +5406,7 @@ enum ExtensionShims {
             return nil
         case "power.reportActivity":
             var assertion: IOPMAssertionID = 0
-            IOPMAssertionDeclareUserActivity("An extension in Search" as CFString, kIOPMUserActiveLocal, &assertion)
+            IOPMAssertionDeclareUserActivity("An extension in \(Store.name)" as CFString, kIOPMUserActiveLocal, &assertion)
             return nil
 
         // MARK: browsing data
@@ -5460,7 +5460,7 @@ enum ExtensionShims {
         case "readingList.query":
             return []
         case "readingList.addEntry", "readingList.removeEntry", "readingList.updateEntry":
-            throw Unsupported(what: "Search has no reading list")
+            throw Unsupported(what: "\(Store.name) has no reading list")
 
         // MARK: system
         case "system.cpu.getInfo":
@@ -5517,7 +5517,7 @@ enum ExtensionShims {
             if let collapsed = props["collapsed"] as? Bool, collapsed != group.collapsed { browser.toggleTabGroup(group.id) }
             return chromeGroup(browser.tabGroups.first { $0.id == group.id } ?? group)
         case "tabGroups.move":
-            throw Unsupported(what: "Search can't move a tab group for an extension")
+            throw Unsupported(what: "\(Store.name) can't move a tab group for an extension")
         case "tabs.group":
             let places: [Any] = first as? [Any] ?? []
             let tabs = places.compactMap { located($0, context: context, owner: owner) }
@@ -5568,7 +5568,7 @@ enum ExtensionShims {
             throw Unsupported(what: "getAuthToken needs a Google account signed into Chrome; this extension would need launchWebAuthFlow instead")
 
         default:
-            throw Unsupported(what: "\(api) isn't available in Search")
+            throw Unsupported(what: "\(api) isn't available in \(Store.name)")
         }
     }
 

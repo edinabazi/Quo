@@ -194,7 +194,7 @@ final class PageTranslator {
             report["collectMs"] = ms()
             let sample = String(first.prefix(400).map(\.plain).joined(separator: "\n").prefix(4000))
             guard let from = PageTranslator.detect(sample, hint: await hint) else {
-                throw Failure("Search couldn't tell which language this page is in")
+                throw Failure("\(Store.name) couldn't tell which language this page is in")
             }
             // A page call comes back even after end() cancelled the run, and
             // end() is the only way a translator loses its tab: from here a
@@ -570,7 +570,7 @@ final class PageTranslator {
             case .unsupportedLanguagePairing, .unsupportedSourceLanguage, .unsupportedTargetLanguage:
                 return "\(language) to \(name(code(to))) can't be translated on this Mac"
             case .unableToIdentifyLanguage:
-                return "Search couldn't tell which language this page is in"
+                return "\(Store.name) couldn't tell which language this page is in"
             default:
                 break
             }

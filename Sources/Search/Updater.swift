@@ -170,10 +170,10 @@ final class Updater: ObservableObject {
         }
         switch stage {
         case .ready(let next):
-            say?("Search \(next.version) is ready — relaunch to use it")
+            say?("\(Store.name) \(next.version) is ready — relaunch to use it")
             return
         case .fetching(let next):
-            say?("Search \(next.version) is downloading…")
+            say?("\(Store.name) \(next.version) is downloading…")
             return
         default: break
         }
@@ -181,7 +181,7 @@ final class Updater: ObservableObject {
         say?("Checking for updates…")
         check { [weak self] found in
             guard let self else { return }
-            if found == nil { self.say?("Search is up to date"); return }
+            if found == nil { self.say?("\(Store.name) is up to date"); return }
             // The waiting branch or `take` announces the next state afterward.
         }
     }
@@ -211,7 +211,7 @@ final class Updater: ObservableObject {
             case .waiting(let known) where known == found: break
             case .none, .offered, .waiting:
                 stage = .waiting(found)
-                say?("Search \(found.version) is out — choose Install Update in the Search menu")
+                say?("\(Store.name) \(found.version) is out — choose Install Update in the \(Store.name) menu")
             }
         }
     }
@@ -239,7 +239,7 @@ final class Updater: ObservableObject {
     func openDisk() {
         guard case .offered(let release) = stage, !fetchingDisk else { return }
         fetchingDisk = true
-        say?("Downloading Search \(release.version)…")
+        say?("Downloading \(Store.name) \(release.version)…")
         Task.detached(priority: .utility) {
             let result: Result<URL, Error>
             do { result = .success(try await Swap.disk(release)) } catch { result = .failure(error) }
@@ -274,7 +274,7 @@ final class Updater: ObservableObject {
         case .none, .offered, .waiting: break
         }
         stage = .fetching(release)
-        say?("Search \(release.version) is downloading…")
+        say?("\(Store.name) \(release.version) is downloading…")
         Task.detached(priority: .utility) {
             let worked: Bool
             do {
@@ -291,8 +291,8 @@ final class Updater: ObservableObject {
         guard case .fetching(let fetching) = stage, fetching == release else { return }
         stage = worked ? .ready(release) : .offered(release)
         say?(worked
-            ? "Search \(release.version) is ready — it's there the next time you open it"
-            : "Search \(release.version) is out — choose Download Update in the Search menu")
+            ? "\(Store.name) \(release.version) is ready — it's there the next time you open it"
+            : "\(Store.name) \(release.version) is out — choose Download Update in the \(Store.name) menu")
     }
 
     /// Quit, and come back as the new one. A shell waits for this process

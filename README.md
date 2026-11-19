@@ -46,6 +46,7 @@ Quo runs beside an installed Search without sharing anything with it:
 
 | | Search | Quo |
 |---|---|---|
+| Name in the app | Search | Quo: menus, Settings, alerts, permission prompts, the AppleScript dictionary |
 | Bundle ID | `com.officecommun.search` | `com.edinabazi.quo` |
 | Tabs, history, pins, extensions | `~/Library/Application Support/Search` | `~/Library/Application Support/Quo` |
 | Settings | `com.officecommun.search` | `com.edinabazi.quo` |
@@ -66,6 +67,8 @@ macOS 14 or later, with Xcode 16 or a Swift 6 toolchain. No dependencies beyond 
 ./quo.sh            # build/Quo.app
 ./quo.sh install    # the same, then into /Applications (quits Quo first)
 ```
+
+Everything the app says about itself reads `Store.name`, so it says Quo here and Search in a plain build. Code, comments and file names still say Search, as do the things that would lose data if renamed: the keychain items' labels, the "Search Sync" folder. "A fork of Search by Office Commun" in About, Search's own release notes and the copyright line keep the credit.
 
 `quo.sh` is `build.sh` with a name, a bundle ID and an icon mark of its own (`SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_MARK=Icon/quo-mark.svg`). The app's data folder, settings and WebKit container all follow the bundle ID; the code still says "Search" by default, so upstream changes merge cleanly.
 

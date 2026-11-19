@@ -201,7 +201,7 @@ final class ApplePasswords: ObservableObject {
             .sink { [weak self] on in if !on { self?.disconnect(because: "turned off in Settings") } }
             .store(in: &bag)
         NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.disconnect(because: "Search quit") } }
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.disconnect(because: "\(Store.name) quit") } }
             .store(in: &bag)
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.publisher(for: NSWorkspace.willSleepNotification)
@@ -283,7 +283,7 @@ final class ApplePasswords: ObservableObject {
 
     /// Back to nothing: the helper told goodbye and stopped, every secret
     /// dropped. Also when the switch goes off and when Search quits.
-    func disconnect(because why: String = "asked in Search") {
+    func disconnect(because why: String = "asked in \(Store.name)") {
         if link != nil || state != .idle {
             Self.log.notice("Disconnecting: \(why, privacy: .public), \(self.context, privacy: .public)")
         }
@@ -519,10 +519,10 @@ final class ApplePasswords: ObservableObject {
         switch error {
         case let error as Unavailable: return error.errorDescription ?? "Apple Passwords isn't available"
         case ApplePasswordsError.timedOut: return "Apple's Passwords helper didn't answer"
-        case ApplePasswordsError.gone: return "Apple's Passwords helper wouldn't run for this copy of Search"
+        case ApplePasswordsError.gone: return "Apple's Passwords helper wouldn't run for this copy of \(Store.name)"
         case ApplePasswordsError.notTheHelper: return "The pairing couldn't be checked. Connect again."
         case ApplePasswordsError.badHello, ApplePasswordsError.malformed:
-            return "Apple's Passwords helper answered in a way Search doesn't know"
+            return "Apple's Passwords helper answered in a way \(Store.name) doesn't know"
         default: return "Apple Passwords isn't available on this Mac"
         }
     }

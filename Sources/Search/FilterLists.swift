@@ -196,7 +196,7 @@ final class FilterLists: ObservableObject {
             $0.dropped = converted.dropped
         }
         if converted.used == 0 {
-            return update(id) { $0.trouble = "Nothing in it is a filter Search can use" }
+            return update(id) { $0.trouble = "Nothing in it is a filter \(Store.name) can use" }
         }
         if converted.rules > FilterList.limit {
             return update(id) {
