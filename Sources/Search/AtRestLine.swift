@@ -71,6 +71,10 @@ struct TitleAtRest: View {
     let roomy: Bool
 
     private var on: Bool { shown && rest != nil }
+    /// The title doesn't fit and ends in "…": then, and only then, the whole
+    /// of it is the row's tooltip.
+    @State private var cut = false
+    @State private var spot = TipSpot()
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -80,6 +84,20 @@ struct TitleAtRest: View {
                 .truncationMode(.tail)
                 .foregroundStyle(colour)
                 .opacity(on && !hovering ? 0 : 1)
+                // The title's own width beside the room it was given.
+                .overlay {
+                    GeometryReader { room in
+                        Text(label)
+                            .font(.system(size: size))
+                            .lineLimit(1)
+                            .fixedSize()
+                            .hidden()
+                            .background(GeometryReader { natural in
+                                Color.clear.preference(key: TitleCut.self, value: natural.size.width > room.size.width + 0.5)
+                            })
+                    }
+                    .allowsHitTesting(false)
+                }
             if let rest, on {
                 AtRestLine(rest: rest, size: size, compact: !roomy)
                     .opacity(hovering ? 0 : 1)
@@ -88,5 +106,25 @@ struct TitleAtRest: View {
         }
         .animation(Motion.reduced ? nil : .easeInOut(duration: 0.22), value: on)
         .animation(nil, value: hovering)
+        .onPreferenceChange(TitleCut.self) { cut = $0 }
+        // The whole title under the row while the pointer is on it
+        // (HoverTip), only when the row cut it short.
+        .background(TipAnchor(spot: spot))
+        .onChange(of: hovering && cut) { _, want in tip(want) }
+        .onChange(of: label) { _, _ in if hovering && cut { tip(true) } }
+        .onAppear { if hovering && cut { tip(true) } }
+        .onDisappear { tip(false) }
+    }
+
+    private func tip(_ want: Bool) {
+        guard let view = spot.view else { return }
+        if want { HoverTip.want(label, from: view) } else { HoverTip.drop(from: view) }
     }
 }
+
+/// Whether a title was cut short to fit.
+private struct TitleCut: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
