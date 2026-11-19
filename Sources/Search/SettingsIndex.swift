@@ -63,6 +63,7 @@ enum SettingsIndex {
         .init(id: "downloads", page: .general, title: "Downloads", icon: "arrow.down.circle"),
 
         .init(id: "theme", page: .appearance, title: "Light and dark", icon: "circle.lefthalf.filled"),
+        .init(id: "density", page: .appearance, title: "Size", icon: "rectangle.expand.vertical"),
         .init(id: "window", page: .appearance, title: "Window", icon: "macwindow"),
         .init(id: "tablook", page: .appearance, title: "Tabs", icon: "textformat.size"),
         .init(id: "motion", page: .appearance, title: "Motion", icon: "wind"),
@@ -198,9 +199,12 @@ enum SettingsIndex {
               title: "Shorter tab bar", detail: "Only a few points above and below the tabs, for more of the page",
               keys: ["tabs.compact"], words: ["compact", "slim", "thin", "height", "padding", "tab bar", "toolbar"],
               parent: "tabs.layout"),
-        .init(id: "sidebar.roomy", group: "tablook", icon: "textformat.size.larger",
-              title: "Roomier tabs", detail: "Taller rows and larger titles in the column",
-              keys: ["sidebar.roomy"], words: ["bigger", "larger", "text size", "accessibility"], parent: "tabs.layout"),
+        // Its key is still the column's, from when it was Roomier tabs, so
+        // a choice made then is kept.
+        .init(id: "sidebar.roomy", group: "density", icon: "textformat.size.larger",
+              title: "Density", detail: "Roomy: taller tabs and rows, larger text, more space in Settings",
+              keys: ["sidebar.roomy"], words: ["roomy", "roomier", "compact", "dense", "spacious", "bigger", "larger",
+                                               "text size", "tabs", "accessibility"]),
         .init(id: "sidebar.player", group: "tablook", icon: "play.circle",
               title: "What's playing in other tabs", detail: "At the foot of the sidebar, to pause it, play it again or go to it",
               more: "A tab playing sound while you're on another one shows above the sidebar's foot.",
@@ -621,7 +625,7 @@ enum SettingsIndex {
         switch item.id {
         case "pages.dusk": return prefs.look != .light
         case "inspector.dark": return prefs.look != .dark
-        case "sidebar.roomy", "sidebar.player": return prefs.sidebar && !prefs.sideIcons
+        case "sidebar.player": return prefs.sidebar && !prefs.sideIcons
         case "sidebar.hides", "sidebar.slides", "layout.cards", "pins.list": return prefs.sidebar
         case "layout.cardsFullScreen": return prefs.sidebar && prefs.cards
         case "pins.folders": return prefs.sidebar && prefs.listsPins
@@ -646,7 +650,6 @@ enum SettingsIndex {
         case "pages.dusk": return "Only while \(Store.name) isn't set to Light"
         case "inspector.dark": return "Only while \(Store.name) isn't set to Dark"
         case "toolbar.left", "tabs.compact": return "Only with the tabs across the top"
-        case "sidebar.roomy": return "Only with titles in the column"
         case "sidebar.foldIcons", "sidebar.addressBar": return "Only with the column down a side and not hidden until the edge"
         case "profiles.oneWindow": return "Only with more than one profile"
         case "spaces.links": return "Only with Spaces on"

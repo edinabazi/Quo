@@ -95,6 +95,11 @@ struct SettingsPanel: View {
 
     private static let rail: CGFloat = 196
     private static let column: CGFloat = 600
+    /// Roomy (Appearance › Size): the rail and the page's column a little
+    /// wider, for the larger words in them.
+    private var rail: CGFloat { prefs.roomyTabs ? 216 : SettingsPanel.rail }
+    private var column: CGFloat { prefs.roomyTabs ? 680 : SettingsPanel.column }
+    private var roomy: Bool { prefs.roomyTabs }
     private static let width: CGFloat = 720
     private static let height: CGFloat = 540
     /// Where a row's words start, past its icon. What goes under a row's
@@ -108,6 +113,7 @@ struct SettingsPanel: View {
         Group {
             if asTab { tabbed } else { card }
         }
+        .environment(\.roomySettings, prefs.roomyTabs)
         .onChange(of: browser.settingsFind) { _, _ in finding = true }
         .onAppear { if let found { query = found } }
     }
@@ -120,7 +126,7 @@ struct SettingsPanel: View {
             pages
             Rectangle().fill(Palette.hairline).frame(width: 1)
             content
-                .padding(.top, 26)
+                .padding(.top, roomy ? 34 : 26)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -163,17 +169,17 @@ struct SettingsPanel: View {
         let counts = Dictionary(grouping: hits, by: \.page).mapValues(\.count)
         return VStack(alignment: .leading, spacing: 2) {
             Text("Settings")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: roomy ? 14.5 : 13, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 10)
-                .padding(.top, 14)
-                .padding(.bottom, 10)
+                .padding(.top, roomy ? 18 : 14)
+                .padding(.bottom, roomy ? 14 : 10)
             FindField(text: $query, focus: $finding)
-                .padding(.bottom, 10)
+                .padding(.bottom, roomy ? 14 : 10)
             ForEach(Array(Page.blocks.enumerated()), id: \.offset) { index, block in
                 if index > 0 {
                     Rectangle().fill(Palette.hairline).frame(height: 1)
-                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .padding(.horizontal, 10).padding(.vertical, roomy ? 10 : 7)
                 }
                 ForEach(block) { item in
                     PageRow(page: item, on: !searching && page == item,
@@ -185,8 +191,8 @@ struct SettingsPanel: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(8)
-        .frame(width: SettingsPanel.rail, alignment: .leading)
+        .padding(roomy ? 10 : 8)
+        .frame(width: rail, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Palette.wash.opacity(0.45), in: Rectangle())
     }
@@ -241,15 +247,16 @@ struct SettingsPanel: View {
         let count: Int?
         let act: () -> Void
         @State private var hovering = false
+        @Environment(\.roomySettings) private var roomy
 
         var body: some View {
             Button(action: act) {
-                HStack(spacing: 9) {
+                HStack(spacing: roomy ? 11 : 9) {
                     Image(systemName: page.icon)
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(width: 16)
+                        .font(.system(size: roomy ? 13.5 : 12, weight: .medium))
+                        .frame(width: roomy ? 18 : 16)
                     Text(page.title)
-                        .font(.system(size: 13, weight: on ? .medium : .regular))
+                        .font(.system(size: roomy ? 14 : 13, weight: on ? .medium : .regular))
                     Spacer(minLength: 0)
                     if let count, count > 0 {
                         Text("\(count)")
@@ -263,7 +270,7 @@ struct SettingsPanel: View {
                 .foregroundStyle(on ? Palette.ink : (hovering ? Palette.ink.opacity(0.75) : Palette.muted))
                 .opacity(count == 0 ? 0.4 : 1)
                 .padding(.horizontal, 10)
-                .frame(height: 30)
+                .frame(height: roomy ? 36 : 30)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(on ? Palette.ground : (hovering ? Palette.hover : .clear))
@@ -284,11 +291,11 @@ struct SettingsPanel: View {
             HStack(spacing: 10) {
                 if !searching {
                     Image(systemName: page.icon)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: roomy ? 18 : 15, weight: .medium))
                         .foregroundStyle(Palette.ink)
                 }
                 Text(searching ? "Settings matching “\(query.trimmingCharacters(in: .whitespaces))”" : page.title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: roomy ? 21 : 17, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
                 Spacer()
@@ -296,22 +303,22 @@ struct SettingsPanel: View {
                     Door(icon: "xmark", help: "Done   esc") { browser.tuning = false }
                 }
             }
-            .padding(.bottom, 18)
-            .padding(.horizontal, 24)
-            .frame(maxWidth: asTab ? SettingsPanel.column : .infinity)
+            .padding(.bottom, roomy ? 26 : 18)
+            .padding(.horizontal, roomy ? 28 : 24)
+            .frame(maxWidth: asTab ? column : .infinity)
             .frame(maxWidth: .infinity)
 
             ScrollViewReader { reader in
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: roomy ? 32 : 22) {
                         if searching { results } else { section(page) }
                     }
                     .environment(\.ruleInset, 0)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, roomy ? 40 : 24)
                     // Keep the rows narrow, not the scroll view: the empty
                     // space beside them must receive scrolling too.
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: asTab ? SettingsPanel.column : .infinity)
+                    .padding(.horizontal, roomy ? 28 : 24)
+                    .frame(maxWidth: asTab ? column : .infinity)
                     .frame(maxWidth: .infinity)
                 }
                 .onAppear { if let lit { reader.scrollTo(lit, anchor: .center) } }
@@ -592,7 +599,7 @@ struct SettingsPanel: View {
                 set: { on in withAnimation(Motion.glide) { prefs.compactStrip = on } }
             ))
         case "sidebar.roomy":
-            Switch(on: Binding(
+            Segmented(options: [(true, "Roomy"), (false, "Compact")], selection: Binding(
                 get: { prefs.roomyTabs },
                 set: { on in withAnimation(Motion.glide) { prefs.roomyTabs = on } }
             ))
@@ -1128,24 +1135,7 @@ struct SettingsPanel: View {
 
     private var aboutHeader: some View {
         HStack(spacing: 14) {
-            if Store.name == "Search" {
-                Logomark()
-                    .fill(Palette.ink, style: FillStyle(eoFill: true))
-                    .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
-                    .frame(height: 34)
-            } else {
-                // A fork has an icon of its own, not Search's mark: the
-                // app's, its tile as tall as the mark was. The picture is
-                // Apple's 1024 grid, the tile 824 of it, so it is drawn
-                // larger and its clear margin hangs outside the row.
-                let side: CGFloat = (34.0 * 1024 / 824).rounded()
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: side, height: side)
-                    .padding((34 - side) / 2)
-                    .accessibilityHidden(true)
-            }
+            AppMark(height: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text(Store.name)
                     .font(.system(size: 15, weight: .semibold))
@@ -1235,18 +1225,32 @@ private extension View {
 
 /// A group of a section: its small heading with an icon, then its card.
 /// No line under the heading: the rows say what they do.
+private struct RoomySettingsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Appearance › Size is Roomy: Settings' rows taller, its words larger
+    /// and its sections further apart.
+    var roomySettings: Bool {
+        get { self[RoomySettingsKey.self] }
+        set { self[RoomySettingsKey.self] = newValue }
+    }
+}
+
 struct GroupBlock<Content: View>: View {
     let title: String
     let icon: String
     @ViewBuilder let content: () -> Content
+    @Environment(\.roomySettings) private var roomy
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: roomy ? 11 : 8) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: roomy ? 11.5 : 10.5, weight: .semibold))
                 Text(title.uppercased())
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: roomy ? 11.5 : 10.5, weight: .semibold))
                     .tracking(0.5)
             }
             .foregroundStyle(Palette.ink.opacity(0.62))
@@ -1269,6 +1273,9 @@ struct SettingRow<Control: View>: View {
     @ViewBuilder let control: () -> Control
 
     @State private var open = false
+    /// Roomy: taller, with larger words, its icon and text where they were
+    /// across (SettingsPanel.textInset), so what goes under it still lines up.
+    @Environment(\.roomySettings) private var roomy
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1276,12 +1283,12 @@ struct SettingRow<Control: View>: View {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Palette.ink.opacity(0.78))
-                    .frame(width: 26, height: 26)
+                    .frame(width: 26, height: roomy ? 28 : 26)
                     .background(Palette.wash, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: roomy ? 3 : 2) {
                     HStack(spacing: 5) {
                         Text(title)
-                            .font(.system(size: 13))
+                            .font(.system(size: roomy ? 14 : 13))
                             .foregroundStyle(Palette.ink)
                             .fixedSize(horizontal: false, vertical: true)
                         if more != nil {
@@ -1298,14 +1305,14 @@ struct SettingRow<Control: View>: View {
                     }
                     if !detail.isEmpty {
                         Text(detail)
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if open, let more {
                         Text(more)
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 3)
@@ -1322,7 +1329,7 @@ struct SettingRow<Control: View>: View {
         }
         .padding(.leading, 14)
         .padding(.trailing, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, roomy ? 14 : 10)
         .background(lit ? Palette.hover : .clear)
     }
 }

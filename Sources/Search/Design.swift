@@ -378,6 +378,32 @@ enum Motion {
     nonisolated static let slidesKey = "sidebar.slides"
 }
 
+/// The app's mark where a page shows it (Settings › About, the welcome
+/// screen), HEIGHT tall: Search's own mark in Search; in a fork, the fork's
+/// icon instead, its tile as tall as the mark would be. The icon's picture
+/// is Apple's 1024 grid with the tile 824 of it, so it is drawn larger and
+/// its clear margin hangs outside, taking no room of its own.
+struct AppMark: View {
+    let height: CGFloat
+
+    var body: some View {
+        if Store.name == "Search" {
+            Logomark()
+                .fill(Palette.ink, style: FillStyle(eoFill: true))
+                .aspectRatio(Logomark.canvas.width / Logomark.canvas.height, contentMode: .fit)
+                .frame(height: height)
+        } else {
+            let side = (height * 1024 / 824).rounded()
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: side, height: side)
+                .padding((height - side) / 2)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 /// Search's mark — Drice's Subtract.svg, a pill with an S cut out of it,
 /// read from its own path data rather than loaded from a file, so it stays a
 /// crisp vector at any size. No plate, no square behind it: the mark draws exactly

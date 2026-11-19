@@ -12,7 +12,7 @@ Short, and quick to type: Q-U-O rolls across the top row of the keyboard.
 
 ### An address bar above the page
 
-On for a new install, along with the tabs down the side and Roomier tabs. Switch it in **Settings › Tabs › Address bar above the page**. It only applies with the tabs down the side. A Quo that ran before this keeps what it had.
+On for a new install, along with the tabs down the side and Roomy. Switch it in **Settings › Tabs › Address bar above the page**. It only applies with the tabs down the side. A Quo that ran before this keeps what it had.
 
 - **The whole address, always.** The site in ink, the path and query dimmed after it, as Chrome and Dia show it. "Not secure" and look-alike domains still show, exactly as in the tab.
 - **Back, forward and reload** move from the top of the column into the bar.
@@ -21,9 +21,9 @@ On for a new install, along with the tabs down the side and Roomier tabs. Switch
 - **Click the address, or press ⌘L,** to edit it right there, with the same suggestions and site card as editing in the tab. Right-click for Copy Address.
 - It folds away with the column (⌘S) and when a video takes the screen, as the bookmarks bar does.
 
-### Roomier tabs, everywhere
+### Roomy or Compact
 
-On for a new install. With **Settings › Tabs › Roomier tabs** on, the rest of the chrome follows the taller rows: the address bar's field is as tall as a tab, its buttons are larger, and the ⌘T / ⌘L field and its suggestions are a size up.
+**Settings › Appearance › Size › Density**: Roomy, the default for a new install, or Compact, as Search is. Roomy gives the column taller tabs with larger titles, and the rest of the chrome follows: the address bar's field is as tall as a tab, its buttons are larger, the ⌘T / ⌘L field and its suggestions are a size up, and Settings itself has taller rows, larger words and more space between its sections. (It was Roomier tabs, under Tabs; a choice made there is kept.)
 
 ### Filter lists for the built-in blocker
 
@@ -118,4 +118,4 @@ How Search is put together (one file per concern in `Sources/Search/`, the `./be
 
 ## License
 
-MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun. Quo has its own icon, a dark Q on a white tile, made in Icon Composer (`Icon/Quo.icon`; the build turns it into the Dock's styles and the flat `.icns` with Icon Composer's `ictool`, and falls back to the older drawn mark, `Icon/quo-mark.svg`, on a Mac without it). Settings › About shows it too; the welcome screen's logo is still Search's for now. `Sources/Search/FilterList.swift` is a port of [adblock-rust](https://github.com/brave/adblock-rust) and stays under its licence, the Mozilla Public License 2.0.
+MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun. Quo has its own icon, a dark Q on a white tile, made in Icon Composer (`Icon/Quo.icon`; the build turns it into the Dock's styles and the flat `.icns` with Icon Composer's `ictool`, and falls back to the older drawn mark, `Icon/quo-mark.svg`, on a Mac without it). Settings › About and the welcome screen show it too. `Sources/Search/FilterList.swift` is a port of [adblock-rust](https://github.com/brave/adblock-rust) and stays under its licence, the Mozilla Public License 2.0.
