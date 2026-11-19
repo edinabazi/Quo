@@ -289,6 +289,11 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
         d.style.setProperty("min-height", "0", "important");
         h = d.getBoundingClientRect().height;
       }
+      // A page as tall as its view whatever the view is (height: 100vh, a
+      // body of 100%), with its content running on below it, as Ahrefs'
+      // and Cookie-Editor's are: what it holds, not the view it was given,
+      // or it opened 25 points tall and jumped to its height a second on.
+      if (d.scrollHeight > v.clientHeight + 1) h = Math.max(h, d.scrollHeight);
       back();
       return [w, Math.min(600, Math.max(25, Math.ceil(h + innerHeight - v.clientHeight)))];
     }
@@ -336,7 +341,10 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
             popover.animates = animates
         }
         if let id = extensionID { ExtensionPopup.lastSize[id] = size }
-        if loaded { reveal() }
+        // Opened by settle (or the fallback) only, never by a size coming
+        // in: the first measure, from the document being built, landed
+        // after the load and opened it there and then, before the page had
+        // drawn itself, at 25 points tall.
     }
 
     /// How far the page reaches, as a function of "width" or "height":
@@ -431,7 +439,7 @@ final class ExtensionPopup: NSObject, WKUIDelegate, WKNavigationDelegate, NSPopo
                 }
                 // Sized backstage as it goes, so the page lays out at the
                 // room it will have.
-                if let size { self.loaded = false; self.apply(size); self.loaded = true }
+                if let size { self.apply(size) }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self, weak webView] in
                     guard let self, let webView else { return }
                     self.settle(webView, last: size, tries: tries + 1)
