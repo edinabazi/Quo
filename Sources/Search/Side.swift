@@ -89,16 +89,21 @@ struct SideBar: View {
     private var icons: Bool { prefs.iconColumn }
     /// With icons only, the band the stacked lights take: gone in full
     /// screen, with them.
-    private var lightsBand: CGFloat { browser.fullScreen ? 8 : Metrics.iconLights }
+    private var lightsBand: CGFloat {
+        browser.lightsInAddressBar ? AddressBar.height(prefs) : browser.fullScreen ? 8 : Metrics.iconLights
+    }
+    /// The band over the pins: the strip's height, or, under the address
+    /// bar running over the column (lightsInAddressBar), the bar's.
+    private var band: CGFloat { browser.lightsInAddressBar ? AddressBar.height(prefs) : Metrics.strip }
     /// What sits above the pins: the lights' band, and with icons only the
     /// three doors under it.
-    private var top: CGFloat { icons ? lightsBand + Metrics.helmDoors + 8 : Metrics.strip }
+    private var top: CGFloat { icons ? lightsBand + Metrics.helmDoors + 8 : band }
     private var innerEdge: Alignment { onRight ? .leading : .trailing }
 
     /// The window's buttons' corner: gone in full screen, where macOS takes
     /// them away, and back, forward and reload move up to the edge (idea 184).
     private var lights: CGFloat {
-        browser.fullScreen ? 0 : max(0, min(Metrics.sideLights, width - 20 - Metrics.helmDoors))
+        browser.fullScreen || browser.lightsInAddressBar ? 0 : max(0, min(Metrics.sideLights, width - 20 - Metrics.helmDoors))
     }
 
     var body: some View {
@@ -130,7 +135,7 @@ struct SideBar: View {
                     }
                     DragStrip(menu: columnMenu)
                 }
-                .frame(height: Metrics.strip)
+                .frame(height: band)
             }
 
             VStack(alignment: .leading, spacing: 0) {
@@ -154,7 +159,7 @@ struct SideBar: View {
                         if !browser.addressBarUp { Helm(browser: browser) }
                         Spacer(minLength: 0)
                     }
-                    .frame(height: Metrics.strip)
+                    .frame(height: band)
                 }
 
                 // The spaces side by side, as pages: two fingers sideways move

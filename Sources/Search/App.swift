@@ -558,7 +558,9 @@ struct ContentView: View {
 
             // The address bar, beside the column's top, above the page's card
             // and no wider (AddressBar.swift).
-            if addressShown {
+            // With the column on the right, it runs the window's whole width
+            // instead, over the column, drawn above it (see body).
+            if addressShown, !browser.lightsInAddressBar {
                 AddressBar(browser: browser, onFrame: cards)
                     .padding(.leading, sideOnRight ? farGap : chrome.width)
                     .padding(.trailing, sideOnRight ? chrome.width : farGap)
@@ -886,6 +888,22 @@ struct ContentView: View {
                     Fold(browser: browser, prefs: browser.prefs, onDrag: { [edges] in edges.side = $0 })
                 }
             }
+            // With the column on the right, the address bar is the window's
+            // top row from edge to edge: the lights at its start, as a Mac
+            // window has them, the extensions at its far end over the
+            // column, which starts under it (lightsInAddressBar).
+            .overlay(alignment: .top) {
+                if addressShown, browser.lightsInAddressBar {
+                    AddressBar(browser: browser, onFrame: cards)
+                        .padding(.leading, farGap)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        // From the window's very top, as the column is: the
+                        // title bar's safe area put it a band too low, over
+                        // the pins and off the lights' line.
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                }
+            }
             .overlay(alignment: .bottom) { bars }
             .overlay {
                 // Over the page only: the column, the strip and the bookmarks
@@ -929,6 +947,17 @@ struct ContentView: View {
                 DispatchQueue.main.async { Lights.refresh(window); measureLights() }
             }
             .onChange(of: browser.prefs.columnWidth) { _, _ in
+                DispatchQueue.main.async { Lights.refresh(window); measureLights() }
+            }
+            // The address bar's row holds them with the column on the right,
+            // as tall as Roomy or Compact makes it.
+            .onChange(of: browser.lightsInAddressBar) { _, _ in
+                DispatchQueue.main.async { Lights.refresh(window); measureLights() }
+            }
+            .onChange(of: browser.prefs.roomyTabs) { _, _ in
+                DispatchQueue.main.async { Lights.refresh(window); measureLights() }
+            }
+            .onChange(of: browser.prefs.iconColumn) { _, _ in
                 DispatchQueue.main.async { Lights.refresh(window); measureLights() }
             }
             // On the right, the lights sit in the column's corner, which
@@ -1217,11 +1246,14 @@ struct ContentView: View {
         // Lights.swift. The column's first row is the strip's height too, so
         // its three doors sit on the lights' line.
         let edges = self.edges
+        // With the column on the right and the address bar up, they stay at
+        // the window's left, centred in the bar's row (lightsInAddressBar).
         Lights.keep(window, centreX: { window in
-            browser.prefs.sidebar && browser.prefs.sidePosition == .right
+            browser.prefs.sidebar && browser.prefs.sidePosition == .right && !browser.lightsInAddressBar
                 ? window.frame.width - (edges.side ?? browser.prefs.columnWidth) + Lights.centre.x
                 : Lights.centre.x
-        }, vertical: { _ in browser.prefs.iconColumn }) { measureLights() }
+        }, vertical: { _ in browser.prefs.iconColumn && !browser.lightsInAddressBar },
+           height: { _ in browser.lightsInAddressBar ? AddressBar.height(browser.prefs) : Metrics.strip }) { measureLights() }
         DispatchQueue.main.async { measureLights() }
 
         // The traffic lights are drawn — measured, they paint themselves — but

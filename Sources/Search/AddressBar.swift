@@ -46,8 +46,9 @@ struct AddressBar: View {
             AgentStatus(browser: browser, style: .door)
             ExtensionSlot(browser: browser, edge: .bottom, side: AddressBar.door(browser.prefs))
         }
-        .padding(.leading, 8)
-        .padding(.trailing, onFrame ? 0 : 8)
+        // The window's buttons at its start, with the column on the right.
+        .padding(.leading, browser.lightsInAddressBar && !browser.fullScreen ? Metrics.sideLights : 8)
+        .padding(.trailing, browser.lightsInAddressBar ? 10 : onFrame ? 0 : 8)
         .frame(height: AddressBar.height(browser.prefs))
         .frame(maxWidth: .infinity)
         .background {

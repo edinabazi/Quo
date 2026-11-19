@@ -2293,6 +2293,12 @@ final class Browser: NSObject, ObservableObject {
     /// above the page): the address is edited there, not in the tab's row.
     var addressBarUp: Bool { prefs.addressBar && prefs.sidebar && !folded }
 
+    /// The window's three buttons at its left in the address bar's row,
+    /// with the column on the right: where a Mac window has them, not in
+    /// the column's far corner. Without the bar there is no row at the left
+    /// to hold them, and they stay in the column's.
+    var lightsInAddressBar: Bool { addressBarUp && prefs.sidePosition == .right }
+
     func beginTabEdit(_ tab: Tab) {
         // The column of icons has no row to type in: the field over the
         // page, with the address in it, as ⌘L brings it. The address bar
