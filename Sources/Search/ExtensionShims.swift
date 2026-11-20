@@ -784,9 +784,26 @@ enum ExtensionShims {
         }
         for (const sub of ["local", "sync", "session", "managed"]) { try { if (ns[sub] && typeof ns[sub] === "object") kept.add(ns[sub]); } catch (e) {} }
       }
+      // WebKit's runtime.lastError can't be set from script: defined or
+      // deleted, it reads WebKit's own all the same, null outside WebKit's
+      // own callbacks. So every failure the shim told a callback about
+      // looked like success — Claude's clicks "worked" on a debugger that
+      // had never attached. Where it can't be set, the callback is called
+      // from WebKit's own callback for a message to the browser that fails
+      // with the same words (`raise` in ExtensionShims.answer): WebKit's
+      // lastError is then the shim's.
+      let lastErrorSticks = null;
       const withLastError = (error, callback) => {
-        put(runtime, "lastError", { message: String(error && error.message || error) });
-        try { callback(); } finally { try { delete runtime.lastError; } catch (e) {} }
+        const message = String(error && error.message || error);
+        put(runtime, "lastError", { message });
+        if (lastErrorSticks === null) lastErrorSticks = !!(runtime.lastError && runtime.lastError.message === message);
+        if (lastErrorSticks || typeof runtime.sendNativeMessage !== "function") {
+          try { callback(); } finally { try { delete runtime.lastError; } catch (e) {} }
+          return;
+        }
+        try { delete runtime.lastError; } catch (e) {}
+        try { runtime.sendNativeMessage("search", { api: "raise", args: [message] }, () => callback()); }
+        catch (e) { callback(); }
       };
       const native = (api, args) =>
         runtime.sendNativeMessage("search", { api, args: JSON.parse(JSON.stringify(args ?? [])) })
@@ -2677,9 +2694,91 @@ enum ExtensionShims {
           getCapturedTabs: (cb) => { if (cb) cb([]); else return Promise.resolve([]); }, onStatusChanged: event() });
       }
       put2("pageCapture", { saveAsMHTML: refuse("pageCapture.saveAsMHTML") });
-      put2("debugger", { attach: refuse("debugger.attach"), detach: refuse("debugger.detach"),
-        sendCommand: refuse("debugger.sendCommand"), getTargets: (cb) => { if (cb) cb([]); else return Promise.resolve([]); },
-        onEvent: event(), onDetach: event() });
+      // Chrome's debugger, for an extension that works a page as a person
+      // would — Claude, ChatGPT's agent — answered by the browser with the
+      // tab's own view (ExtensionDebugger.swift): real clicks and keys,
+      // pictures, scripts in the page. Only for one that asks for it.
+      if (declares("debugger") && !chrome.debugger) {
+        const onEvent = event(), onDetach = event(), mine = new Set(), paged = new Set(), ran = new Set();
+        const tell = (ev, args) => {
+          for (const f of [...ev.listeners]) try { f(...args); } catch (e) { setTimeout(() => { throw e; }); }
+        };
+        const answered = (f) => (...args) => {
+          const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
+          const p = Promise.resolve().then(() => f(...args));
+          if (!callback) return p;
+          p.then((v) => callback(v), (e) => withLastError(e, callback));
+        };
+        const tabOf = (target) => {
+          const id = target && target.tabId;
+          if (typeof id !== "number") throw new Error("Either tab id or extension id must be specified.");
+          return id;
+        };
+        const placed = async (id) => {
+          const tab = await chrome.tabs.get(id).catch(() => null);
+          if (!tab) throw new Error("No tab with given id " + id + ".");
+          return { tab, place: placeOf(tab, await frames()) };
+        };
+        const contextOf = (id, url) => {
+          let origin = "";
+          try { origin = new URL(url).origin; } catch (e) {}
+          return { context: { id: 1, origin, name: "", uniqueId: "quo-" + id,
+            auxData: { isDefault: true, type: "default", frameId: "" } } };
+        };
+        // Chrome says so when an attached tab goes, or leaves the web.
+        if (chrome.tabs && chrome.tabs.onRemoved) chrome.tabs.onRemoved.addListener((id) => {
+          if (!mine.has(id)) return;
+          mine.delete(id); paged.delete(id); ran.delete(id);
+          native("debugger.detach", [id]).catch(() => {});
+          tell(onDetach, [{ tabId: id }, "target_closed"]);
+        });
+        if (chrome.tabs && chrome.tabs.onUpdated) chrome.tabs.onUpdated.addListener((id, change, tab) => {
+          if (!mine.has(id) || !change.url) return;
+          if (paged.has(id)) tell(onEvent, [{ tabId: id }, "Page.frameNavigated",
+            { frame: { id: "", loaderId: String(Date.now()), url: change.url, securityOrigin: "", mimeType: "text/html" }, type: "Navigation" }]);
+          if (ran.has(id)) {
+            tell(onEvent, [{ tabId: id }, "Runtime.executionContextsCleared", {}]);
+            tell(onEvent, [{ tabId: id }, "Runtime.executionContextCreated", contextOf(id, change.url)]);
+          }
+        });
+        put2("debugger", {
+          attach: answered(async (target, version) => {
+            const id = tabOf(target), { place } = await placed(id);
+            await native("debugger.attach", [id, place, String(version || "")]);
+            mine.add(id);
+          }),
+          detach: answered(async (target) => {
+            const id = tabOf(target);
+            mine.delete(id); paged.delete(id); ran.delete(id);
+            await native("debugger.detach", [id]);
+          }),
+          sendCommand: answered(async (target, method, params) => {
+            const id = tabOf(target), { tab, place } = await placed(id);
+            const answer = await native("debugger.send", [id, place, String(method), params || {}]);
+            if (method === "Page.enable") paged.add(id);
+            if (method === "Page.disable") paged.delete(id);
+            if (method === "Runtime.disable") ran.delete(id);
+            if (method === "Runtime.enable" && !ran.has(id)) {
+              ran.add(id);
+              setTimeout(() => tell(onEvent, [{ tabId: id }, "Runtime.executionContextCreated", contextOf(id, tab.url)]));
+            }
+            return answer && typeof answer === "object" ? answer : {};
+          }),
+          getTargets: answered(async () => {
+            const ids = new Set(await native("debugger.targets", []));
+            const tabs = chrome.tabs ? await chrome.tabs.query({}) : [];
+            return tabs.map((t) => ({ type: "page", id: String(t.id), tabId: t.id, title: t.title || "", url: t.url || "",
+              faviconUrl: t.favIconUrl, attached: ids.has(t.id) }));
+          }),
+          onEvent, onDetach,
+          DetachReason: { CANCELED_BY_USER: "canceled_by_user", TARGET_CLOSED: "target_closed" },
+          TargetInfoType: { BACKGROUND_PAGE: "background_page", OTHER: "other", PAGE: "page", WORKER: "worker" },
+        });
+      } else {
+        put2("debugger", { attach: refuse("debugger.attach"), detach: refuse("debugger.detach"),
+          sendCommand: refuse("debugger.sendCommand"), getTargets: (cb) => { if (cb) cb([]); else return Promise.resolve([]); },
+          onEvent: event(), onDetach: event() });
+      }
       put2("gcm", { register: refuse("gcm.register"), unregister: refuse("gcm.unregister"), send: refuse("gcm.send"),
         onMessage: event(), onMessagesDeleted: event(), onSendError: event() });
       put2("instanceID", { getID: refuse("instanceID.getID"), getToken: refuse("instanceID.getToken"),
@@ -4675,6 +4774,9 @@ enum ExtensionShims {
             return ["error": "Not a Search message"]
         }
         let args = body["args"] as? [Any] ?? []
+        // A failure with these words, for WebKit to set as lastError while
+        // it calls the shim back (see withLastError in the script).
+        if api == "raise" { throw Unsupported(what: args.first as? String ?? "Unknown error") }
         do {
             return ["value": try await run(api, args, context: context, owner: owner) ?? NSNull()]
         } catch {
@@ -4737,6 +4839,7 @@ enum ExtensionShims {
         "tts": "tts",
         "tabGroups": "tabGroups",
         "fontSettings": "fontSettings",
+        "debugger": "debugger",
         "system.cpu": "system.cpu",
         "system.memory": "system.memory",
         "system.storage": "system.storage",
@@ -5399,6 +5502,27 @@ enum ExtensionShims {
             Store.settings.set(had.filter { !gone.contains($0) }, forKey: "extensions.granted.\(id)")
             return true
 
+        // MARK: debugger (ExtensionDebugger.swift)
+        // Each call names its tab twice: Chrome's id, which attachments are
+        // kept by, and where the tab is, which finds it.
+        case "debugger.attach":
+            let number = (first as? NSNumber)?.intValue ?? -1
+            let tab = located(args.dropFirst().first, context: context, owner: owner)
+            try ExtensionDebugger.attach(number, tab: tab, extension: id)
+            return nil
+        case "debugger.detach":
+            try ExtensionDebugger.detach((first as? NSNumber)?.intValue ?? -1, extension: id)
+            return nil
+        case "debugger.targets":
+            return ExtensionDebugger.targets(extension: id)
+        case "debugger.send":
+            let number = (first as? NSNumber)?.intValue ?? -1
+            let rest = Array(args.dropFirst())
+            let tab = located(rest.first, context: context, owner: owner)
+            return try await ExtensionDebugger.send(rest.dropFirst().first as? String ?? "",
+                                                    rest.dropFirst(2).first as? [String: Any] ?? [:],
+                                                    tabID: number, tab: tab, extension: id)
+
         // MARK: tabs, by where they are in the row
         case "tabs.describe":
             let places: [Any] = first as? [Any] ?? []
@@ -5604,6 +5728,8 @@ enum ExtensionShims {
                 // A new group, as its menu makes one, without its name to type.
                 target = browser.addTabGroup(containing: tabs[0])
                 browser.editingGroupID = nil
+                // An agent's own group, made to work in: it looks like one.
+                if allowed(id, context: context).contains("debugger") { browser.markAgentGroup(target, agent: id) }
             }
             for tab in tabs { browser.move(tab, toGroup: target) }
             return TabGroup.number(target)

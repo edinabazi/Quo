@@ -4,6 +4,8 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Looks and feel
 
+- **An agent's tab group looks like one**: the group Claude or another agent makes to work in shows the agent's icon before its name, a soft wash of colour and a thread down the side of its tabs, and, while the agent is working there, moving dots and a light passing over the heading. Your own groups look as before. *Nov 2026*
+- **Group headings fit Roomy**: taller, with larger names, so they sit in proportion with Roomy's taller tabs instead of looking squeezed between them, and a folded group shows its fold mark. *Nov 2026*
 - **An onboarding to match Arc's and Dia's**: six full-window steps on a slowly moving gradient, with frosted cards that rise in. Pick the look, where the tabs go, Roomy or Compact and a colour, with a live preview; bring Arc's spaces or another browser's things over; set up sync, the blocker and its lists, and the default browser; and finish on the six keys worth knowing. Search had four plain pages. *Nov 2026*
 - **Roomy or Compact** (Settings › Appearance › Size), Roomy by default. Taller tabs and rows and larger text in the column, a larger address bar and ⌘T field, and more room in Settings, every built-in page (History, Downloads, Bookmarks, Passwords, Archived Tabs), the small window for links and website pop-ups. Pin squares are taller, as Arc's are. *Nov 2026*
 - **The window's buttons stay on the left with the column on the right**, in a row across the top: the address bar, or with it off, a slim row with back, forward and reload. Search moved them into the column's far corner. *Nov 2026*
@@ -26,6 +28,8 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Extensions
 
+- **Agent extensions can work the page, not just read it**: Claude, ChatGPT's agent and any other extension that asks for Chrome's `debugger` can click, drag, type, press keys (Return submits, Tab moves on, ⌘A selects all), scroll, take screenshots and run scripts in a tab, as they do in Chrome. The clicks and keys are real events handed to the page, never to Quo's own menus, and your pointer doesn't move. Search refused the debugger outright, so these extensions could read a page but every action failed or silently did nothing. *Nov 2026*
+- **Extensions hear about their errors**: a failed call now sets `chrome.runtime.lastError` for its callback, as in Chrome. Before, every failure looked like success to an extension written with callbacks. *Nov 2026*
 - **Lighter on every page**: the part of Quo's extension helper that content scripts carry is about 120 KB, not 275 KB, in every frame. 1Password's buttons and menus feel smoother. *Nov 2026*
 - **Popups open at their settled size** instead of opening small and jumping (Ahrefs, Cookie-Editor), or growing and morphing as they open. *Nov 2026*
 - **Notifications work as in Chrome**: an extension's buttons under the notification's Options, and clicks, buttons and dismissals going back to the extension. *Nov 2026*

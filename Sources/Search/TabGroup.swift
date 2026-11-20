@@ -6,10 +6,15 @@ struct TabGroup: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
     var collapsed: Bool
+    /// The extension that made it to work in — an agent driving pages
+    /// through Chrome's debugger, as Claude's and ChatGPT's do — by its id,
+    /// for its icon and its look in the column (AgentGroups.swift). Nil for
+    /// a group of your own.
+    var agent: String? = nil
 }
 
 extension TabGroup {
-    private enum Keys: String, CodingKey { case id, name, collapsed }
+    private enum Keys: String, CodingKey { case id, name, collapsed, agent }
 
     /// A group saved without its folded state is an open one.
     init(from decoder: Decoder) throws {
@@ -17,6 +22,7 @@ extension TabGroup {
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         collapsed = (try? c.decodeIfPresent(Bool.self, forKey: .collapsed)) ?? false
+        agent = try? c.decodeIfPresent(String.self, forKey: .agent)
     }
 }
 

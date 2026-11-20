@@ -2900,7 +2900,8 @@ final class Bench {
             answer(["viewItems": items(view), "spaceItems": items(SpaceMenu.menu(for: browser)), "brackets": brackets,
                     "on": browser.prefs.usesTabGroups, "groups": browser.tabGroups.map { group in
                 ["id": String(group.id.uuidString.prefix(8)).lowercased(), "name": group.name, "collapsed": group.collapsed,
-                 "tabs": browser.tabs(in: group.id).map(Bench.short)] as [String: Any]
+                 "tabs": browser.tabs(in: group.id).map(Bench.short), "agent": group.agent ?? NSNull(),
+                 "working": browser.tabs(in: group.id).contains { AgentActivity.shared.working.contains($0.id) }] as [String: Any]
             }])
 
         case "tospace":

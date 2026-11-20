@@ -570,7 +570,7 @@ struct SideBar: View {
         // A split is a line for each page (see SplitTabItem): the lines
         // past the first.
         let pairs = rows.reduce(0) { $0 + max(0, (browser.split(for: $1)?.tabs.count ?? 1) - 1) }
-        let heading = icons ? GroupHeading.compactHeight : GroupHeading.height
+        let heading = icons ? GroupHeading.compactHeight : GroupHeading.height(prefs)
         // A folded group showing none of its tabs still has its empty stack
         // of them under its heading, and the gap after it.
         let headings = CGFloat(grouped.count) * (heading + SideBar.gap)
@@ -1059,9 +1059,11 @@ struct SideBar: View {
             }
         }
         // With icons only, the group's tiles held by a thin bracket in the
-        // margin, rather than set in under a name.
+        // margin, rather than set in under a name. An agent's tabs, set in
+        // under its name, hang on a thread of its colours.
         .overlay(alignment: .leading) {
             if icons && !members.isEmpty { IconGroupBracket(folded: group.collapsed).offset(x: -6) }
+            else if group.agent != nil && !members.isEmpty { AgentThread().padding(.leading, 6) }
         }
     }
 
