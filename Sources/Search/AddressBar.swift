@@ -63,7 +63,7 @@ struct AddressBar: View {
                 onFrame ? Palette.frame : Palette.ground
                 // The column's wash carried on under the bar, or the colour
                 // stopped at its edge.
-                SpaceWash(look: browser.wash)
+                SpaceWash(look: browser.wash, space: browser.washSpace)
             }
         }
         .overlay(alignment: .bottom) {

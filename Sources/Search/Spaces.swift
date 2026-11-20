@@ -43,6 +43,10 @@ struct Space: Codable, Identifiable, Equatable {
     /// How strongly its colour or gradient washes the chrome (see
     /// SpaceStrength); nil, as every space from before has, for Subtle.
     var strength: SpaceStrength? = nil
+    /// How much film grain lies over its wash, 0 to 1 (see Grain); nil, as
+    /// every space from before has, for none — or, on a gradient from
+    /// before amounts that has its grain switched on, that grain.
+    var grain: SpaceGrain? = nil
 
     var profileID: UUID { profile ?? Profile.personalID }
 
@@ -360,6 +364,14 @@ extension Browser {
     /// How strongly the wash is drawn: the space on screen's strength.
     var washStrength: SpaceStrength { wash == nil ? .subtle : space.washStrength }
 
+    /// How much grain lies over the wash: the space on screen's.
+    var washGrain: Double { wash == nil ? 0 : space.grainAmount }
+
+    /// The space whose look the wash is, for the picker's live preview
+    /// (LookDraft): the one on screen, with or without a look yet; none
+    /// with spaces off or while a new one is being made, as the wash.
+    var washSpace: UUID? { prefs.usesSpaces && !makingSpace ? spaceID : nil }
+
     /// The wash's colour, when it is one of the colours rather than a gradient.
     var washColour: Int? {
         if case .colour(let colour)? = wash { return colour }
@@ -558,17 +570,34 @@ extension Browser {
     func setSpaceColour(_ id: UUID, to colour: Int) {
         guard let at = spaces.firstIndex(where: { $0.id == id }), Spaces.colours.indices.contains(colour) else { return }
         spaces[at].colour = colour
-        // A colour picked is the colour wanted: the gradient goes.
+        // A colour picked is the colour wanted: the gradient goes, and the
+        // grain a gradient from before amounts had stays, as an amount.
+        if spaces[at].grain == nil, spaces[at].gradient?.grain == true { spaces[at].grain = SpaceGrain(Grain.legacy) }
         spaces[at].gradient = nil
         Spaces.write(spaces, profile: profileID)
     }
 
     /// The space's gradient, or none to go back to its colour. One that
-    /// can't be drawn (fewer than two colours) is none.
+    /// can't be drawn (no colour that reads) is none. Its grain switch
+    /// follows the space's amount, for a Search from before amounts.
     func setSpaceGradient(_ id: UUID, to gradient: SpaceGradient?) {
         guard let at = spaces.firstIndex(where: { $0.id == id }) else { return }
-        let gradient = gradient.flatMap { $0.usable ? $0 : nil }
+        var gradient = gradient.flatMap { $0.usable ? $0 : nil }
+        if let grain = spaces[at].grain { gradient?.grain = grain.amount > 0 }
         guard spaces[at].gradient != gradient else { return }
+        spaces[at].gradient = gradient
+        Spaces.write(spaces, profile: profileID)
+    }
+
+    /// How much grain lies over the space's wash, 0 for none, kept as none.
+    func setSpaceGrain(_ id: UUID, to amount: Double) {
+        guard let at = spaces.firstIndex(where: { $0.id == id }) else { return }
+        let amount = SpaceGrain(amount).amount
+        let kept: SpaceGrain? = amount > 0 ? SpaceGrain(amount) : nil
+        var gradient = spaces[at].gradient
+        gradient?.grain = amount > 0
+        guard spaces[at].grain != kept || spaces[at].gradient != gradient else { return }
+        spaces[at].grain = kept
         spaces[at].gradient = gradient
         Spaces.write(spaces, profile: profileID)
     }
@@ -634,31 +663,52 @@ extension Browser {
 /// ground. Handed the look rather than the browser, so it is drawn again
 /// only when the look changes, not on everything the browser announces. A
 /// change crossfades once and is done: nothing runs while it stays.
+///
+/// While the Colour… picker's handles or grain are dragged, the look being
+/// dragged to stands in for the space's (LookDraft), with nothing
+/// crossfading: each frame is the look under the pointer. Only these washes
+/// are drawn again for it, not the window.
 struct SpaceWash: View {
     let look: SpaceLook?
+    /// The space it is the look of, for the picker's preview; nil for none.
+    var space: UUID? = nil
     @Environment(\.colorScheme) private var scheme
     /// Subtle, Rich or Vivid: set for the whole window (see washStrength).
     @Environment(\.washStrength) private var strength
+    /// The grain over it, the same way (see washGrain).
+    @Environment(\.washGrain) private var grain
+    @ObservedObject private var draft = LookDraft.shared
 
     var body: some View {
+        let live = draft.preview(for: space)
+        let look = live.map(\.look) ?? self.look
+        let strength = live?.strength ?? self.strength
+        let grain = live?.grain ?? self.grain
+        let dark = scheme == .dark
         ZStack {
             switch look {
             case .colour(let colour)?:
-                if Spaces.wash(colour, dark: scheme == .dark) != nil {
-                    Spaces.toned(colour, strength, dark: scheme == .dark).opacity(strength.opacity(dark: scheme == .dark))
+                if Spaces.wash(colour, dark: dark) != nil {
+                    Spaces.toned(colour, strength, dark: dark).opacity(strength.opacity(dark: dark))
                 }
             case .gradient(let gradient)?:
-                // One gradient for another crossfades, as a colour does.
+                // One gradient for another crossfades, as a colour does;
+                // a gradient being dragged is one view that follows.
                 GradientWash(gradient: gradient, strength: strength)
-                    .id(gradient)
+                    .id(live == nil ? AnyHashable(gradient) : AnyHashable("live"))
                     .transition(.opacity)
             case nil:
                 EmptyView()
             }
+            if look != nil, grain > 0 {
+                GrainWash(opacity: strength.grain(grain, dark: dark))
+                    .transition(.opacity)
+            }
         }
         .allowsHitTesting(false)
-        .animation(Motion.quick, value: look)
-        .animation(Motion.quick, value: strength)
+        .animation(live == nil ? Motion.quick : nil, value: look)
+        .animation(live == nil ? Motion.quick : nil, value: strength)
+        .animation(live == nil ? Motion.quick : nil, value: grain)
     }
 }
 

@@ -66,11 +66,20 @@ final class SpaceGradientTests: XCTestCase {
         }
     }
 
-    func testFewerThanTwoColoursIsTheColourAndMoreThanThreeAreThree() {
+    /// One colour off the wheel is a colour of its own; none that reads is
+    /// the space's colour; past three, three.
+    func testOneColourIsItsOwnNoneIsTheColourAndMoreThanThreeAreThree() {
         var space = Space(id: UUID(), name: "One", colour: 1)
         space.gradient = SpaceGradient(colours: [blue])
-        XCTAssertEqual(space.look, .colour(1))
+        XCTAssertEqual(space.look, .gradient(SpaceGradient(colours: [blue])))
+        XCTAssertEqual(space.lookName, "Custom colour")
+        XCTAssertEqual(space.gradient?.stops().count, 2, "one colour, drawn flat")
+        XCTAssertEqual(Set(space.gradient!.stops().map(\.color)).count, 1)
         space.gradient = SpaceGradient(colours: [blue, "nonsense"])
+        XCTAssertTrue(space.gradient!.single, "what doesn't read is left out")
+        space.gradient = SpaceGradient(colours: ["nonsense"])
+        XCTAssertEqual(space.look, .colour(1))
+        space.gradient = SpaceGradient(colours: [])
         XCTAssertEqual(space.look, .colour(1))
         space.colour = 0
         XCTAssertNil(space.look, "no colour and no usable gradient: nothing, as before")
@@ -410,7 +419,9 @@ final class SpaceGradientTests: XCTestCase {
         browser.setSpaceGradient(second, to: nil)
         XCTAssertEqual(browser.wash, .colour(2), "removed: back to its colour")
         browser.setSpaceGradient(second, to: SpaceGradient(colours: [blue]))
-        XCTAssertEqual(browser.wash, .colour(2), "one colour is no gradient")
+        XCTAssertEqual(browser.wash, .gradient(SpaceGradient(colours: [blue])), "one colour off the wheel is a colour of its own")
+        browser.setSpaceGradient(second, to: SpaceGradient(colours: ["#nope"]))
+        XCTAssertEqual(browser.wash, .colour(2), "none that reads is no look of its own")
 
         browser.setSpaceGradient(second, to: gradient)
         browser.setSpaceColour(second, to: 4)

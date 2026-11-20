@@ -12,7 +12,10 @@ spaces.json (a space without one is written as before), comes back after a
 relaunch, and goes when removed or when a plain colour is picked. A
 gradient spaces.json can't read costs the space its gradient, never the
 list. Its strength (Subtle, Rich, Vivid) is kept the same way, and one
-that doesn't read is Subtle. The editor itself is a popover and is never opened here: how it looks
+that doesn't read is Subtle. The wheel's handles (`wheel`, `handle`,
+`turn`) snap, show on the window while held and are written only when let
+go (`letgo`); grain likewise, over a colour or a gradient, kept beside the
+look. The editor itself is a popover and is never opened here: how it looks
 is checked off screen (see SpaceGradientTests).
 """
 import json
@@ -40,6 +43,11 @@ def saved():
 
 def menu(st):
     return [i["title"] for i in st["menu"]]
+
+
+def OKLab_grey(hex):
+    r, g, b = (int(hex[i:i + 2], 16) for i in (1, 3, 5))
+    return max(r, g, b) - min(r, g, b) <= 2
 
 
 def ringed(st):
@@ -93,7 +101,9 @@ def main():
         st = space(action="colour", colour=3)
         t.ok("a colour picked replaces the gradient", st["wash"] == "Orange" and "gradient" not in saved()["Two"], st["wash"])
         st = space(action="gradient", colours=["#4285F5"])
-        t.ok("one colour is no gradient", st["wash"] == "Orange", st["wash"])
+        t.ok("one colour is a colour of its own", st["wash"] == "Gradient" and st["picker"]["preview"] == "Custom colour", st["picker"])
+        st = space(action="gradient", colours=["#nope"])
+        t.ok("none that reads: the space's colour", st["wash"] == "Orange", st["wash"])
 
         # The picker's choices, as its swatches make them.
         st = space(action="pick", choice="Dusk")
@@ -136,22 +146,81 @@ def main():
         t.ok("Subtle again: unwritten", "strength" not in saved()["Two"], saved()["Two"])
         space(action="strength", strength="vivid")
 
+        # The wheel: handles dragged, snapping, shown on the window while
+        # held and written only when let go; + and −, the arrow, and grain.
+        st = space(action="pick", choice="None")
+        t.ok("wheel: None, no handles", st["picker"]["handles"] == [] and len(st["picker"]["snaps"]) == 13, st["picker"]["handles"])
+        teal = st["picker"]["snaps"][5]  # the swatches' order: Teal is the sixth
+        before = open(f"{sv.SUPPORT}/spaces.json").read()
+        drafted = st["drafted"]
+        st = space(action="wheel", handle=0, x=teal["x"] + 0.05, y=teal["y"], held=True)
+        t.ok("wheel: a press on the empty wheel, dragged near Teal, held: shown, snapped to it",
+             st["draft"] != "" and st["draft"]["colours"] == [teal["hex"]] and st["drafted"] > drafted, st["draft"])
+        t.ok("wheel: nothing written while held", open(f"{sv.SUPPORT}/spaces.json").read() == before and st["wash"] == "", st["wash"])
+        st = space(action="letgo")
+        t.ok("wheel: let go, kept as a colour of its own", st["draft"] == "" and st["wash"] == "Gradient"
+             and st["picker"]["preview"] == "Custom colour" and saved()["Two"]["gradient"]["colours"] == [teal["hex"]], st["picker"])
+        st = space(action="handle", op="add")
+        t.ok("wheel: + adds a second handle, a gradient", len(st["picker"]["handles"]) == 2 and st["picker"]["preview"] == "Custom gradient", st["picker"]["handles"])
+        st = space(action="handle", op="add")
+        t.ok("wheel: and a third", len(st["picker"]["handles"]) == 3, st["picker"]["handles"])
+        try:
+            space(action="wheel", handle=3, x=0.0, y=0.0); refused = False
+        except RuntimeError:
+            refused = True
+        t.ok("wheel: no fourth", refused and len(space()["picker"]["handles"]) == 3, refused)
+        st = space(action="wheel", handle=2, x=0.02, y=-0.01)
+        t.ok("wheel: dragged to the middle, it snaps to the grey", OKLab_grey(st["picker"]["handles"][2]["hex"]), st["picker"]["handles"])
+        st = space(action="handle", op="remove", index=2)
+        t.ok("wheel: − takes a handle off", len(st["picker"]["handles"]) == 2, st["picker"]["handles"])
+        angle = st["picker"]["angle"]
+        st = space(action="turn")
+        t.ok("wheel: the arrow turns it an eighth", st["picker"]["angle"] == (angle + 45) % 360, st["picker"]["angle"])
+        snaps = st["picker"]["snaps"]
+        st = space(action="pick", choice="Lagoon")
+        hs = st["picker"]["handles"]
+        t.ok("wheel: a ready-made gradient's handles sit on snaps",
+             all(any(abs(h["x"] - s["x"]) < 0.02 and abs(h["y"] - s["y"]) < 0.02 for s in snaps) for h in hs), hs)
+        st = space(action="wheel", handle=0, x=hs[0]["x"], y=hs[0]["y"])
+        t.ok("wheel: let go where it was, still Lagoon", st["picker"]["kind"] == "gradient" and st["picker"]["ringed"] == "Lagoon", st["picker"])
+
+        st = space()
+        t.ok("grain: none, unwritten", st["grain"] == 0 and "grain" not in saved()["Two"], st["grain"])
+        before = open(f"{sv.SUPPORT}/spaces.json").read()
+        st = space(action="grain", amount=0.5, held=True)
+        t.ok("grain: held at a half, shown, not written", st["draft"] != "" and st["draft"]["grain"] == 0.5
+             and open(f"{sv.SUPPORT}/spaces.json").read() == before, st["draft"])
+        st = space(action="letgo")
+        t.ok("grain: let go, kept beside the look", st["grain"] == 0.5 and saved()["Two"].get("grain") == 0.5
+             and saved()["Two"]["gradient"].get("grain") is True and st["grainShows"]["light"] > 0, (st["grain"], saved()["Two"]))
+        st = space(action="pick", choice="Red")
+        t.ok("grain: kept over a plain colour", st["wash"] == "Red" and st["grain"] == 0.5, (st["wash"], st["grain"]))
+        st = space(action="restore", colour=3, colours=DUSK, strength="vivid")
+        t.ok("Escape: the grain it had (none) back", st["grain"] == 0 and "grain" not in saved()["Two"], (st["grain"], saved()["Two"]))
+        st = space(action="grain", amount=0.3)
+        t.ok("grain: set at once", st["grain"] == 0.3, st["grain"])
+        st = space(action="go", index=1)
+        t.ok("⌃1: Personal, no grain", st["grain"] == 0, st["grain"])
+        space(action="go", index=2)
+
         # Kept across a relaunch.
         space(action="gradient", colours=DUSK, angle=180.0)
         sv.quit(); time.sleep(0.5); sv.launch()
         space(action="go", index=2); st = space()
         t.ok("relaunched: Two still has its gradient", st["current"] == "Two" and st["wash"] == "Gradient" and st["gradient"]["angle"] == 180, st["gradient"])
         t.ok("relaunched: and its strength", st["strength"] == "vivid", st["strength"])
+        t.ok("relaunched: and its grain", st["grain"] == 0.3, st["grain"])
 
         # A gradient that doesn't read: the list survives, the colour stands.
         sv.quit(); time.sleep(0.5)
         spaces = json.load(open(f"{sv.SUPPORT}/spaces.json"))
         for s in spaces:
-            if s["name"] == "Two": s["gradient"] = {"colours": "not a list", "angle": "wide"}; s["strength"] = 7
+            if s["name"] == "Two": s["gradient"] = {"colours": "not a list", "angle": "wide"}; s["strength"] = 7; s["grain"] = "lots"
         json.dump(spaces, open(f"{sv.SUPPORT}/spaces.json", "w"))
         sv.launch()
         space(action="go", index=2); st = space()
         t.ok("damaged strength: Subtle", st["strength"] == "subtle", st["strength"])
+        t.ok("damaged grain: none", st["grain"] == 0, st["grain"])
         t.ok("damaged gradient: both spaces there, Two washed with its colour",
              [s["name"] for s in st["spaces"]] == ["Personal", "Two"] and st["current"] == "Two" and st["wash"] == "Orange", (st["spaces"], st["wash"]))
     finally:

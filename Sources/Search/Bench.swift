@@ -4071,11 +4071,69 @@ final class Bench {
                 browser.chooseLook(browser.spaceID, choice)
             case "restore":
                 // Escape in the picker: the look as it was, given as colour,
-                // gradient and strength.
+                // gradient, strength and grain.
                 let colours = request["colours"] as? [String] ?? []
+                LookDraft.shared.end()
                 browser.restoreLook(browser.spaceID, colour: request["colour"] as? Int ?? 0,
                                     gradient: colours.isEmpty ? nil : SpaceGradient(colours: colours),
-                                    strength: (request["strength"] as? String).flatMap(SpaceStrength.init(rawValue:)))
+                                    strength: (request["strength"] as? String).flatMap(SpaceStrength.init(rawValue:)),
+                                    grain: (request["grain"] as? Double).map(SpaceGrain.init))
+            case "wheel":
+                // A handle of the picker's wheel dragged to x, y (the wheel's
+                // middle 0, its rim 1, y down) in twelve steps, each shown on
+                // the window as the picker shows it (LookDraft), snapping as
+                // it goes; let go and kept unless "held". Handle one past the
+                // last is a press on the wheel where there is none.
+                let id = browser.spaceID
+                var points = browser.space.wheelColours.compactMap(ColourWheel.point(for:))
+                let handle = request["handle"] as? Int ?? 0
+                guard handle >= 0, handle <= points.count, handle < SpaceGradient.most else {
+                    answer(["error": "no handle \(handle) on the wheel"]); return
+                }
+                let to = CGPoint(x: request["x"] as? Double ?? 0, y: request["y"] as? Double ?? 0)
+                if handle == points.count { points.append(to) }
+                let from = points[handle]
+                for step in 1...12 {
+                    let t = Double(step) / 12
+                    points[handle] = ColourWheel.snapped(CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)).point
+                    if let gradient = browser.wheelGradient(id, colours: points.map(ColourWheel.hex(at:))) {
+                        LookDraft.shared.show(LookDraft.Preview(space: id, look: .gradient(gradient),
+                                                                strength: browser.space.washStrength, grain: browser.space.grainAmount))
+                    }
+                }
+                if request["held"] as? Bool != true {
+                    let colours = points.map(ColourWheel.hex(at:))
+                    LookDraft.shared.end { browser.setWheel(id, colours: colours) }
+                }
+            case "letgo":
+                // What is held on the wheel or the grain's slider, kept.
+                let id = browser.spaceID
+                if let held = LookDraft.shared.preview(for: id) {
+                    LookDraft.shared.end {
+                        if case .gradient(let gradient)? = held.look { browser.setWheel(id, colours: gradient.colours) }
+                        if held.grain != browser.space.grainAmount { browser.setSpaceGrain(id, to: held.grain) }
+                    }
+                }
+            case "handle":
+                // The wheel's + (add) and − (remove, the handle at index).
+                switch request["op"] as? String {
+                case "add": browser.addWheelHandle(browser.spaceID)
+                case "remove": browser.removeWheelHandle(browser.spaceID, at: request["index"] as? Int ?? 0)
+                default: answer(["error": "handle op is add or remove"]); return
+                }
+            case "turn":
+                // The wheel's arrow: the gradient an eighth of the way round.
+                browser.turnGradient(browser.spaceID)
+            case "grain":
+                // The grain's slider let go at amount (0 to 1), or held there.
+                let amount = request["amount"] as? Double ?? 0
+                if request["held"] as? Bool == true {
+                    let space = browser.space
+                    LookDraft.shared.show(LookDraft.Preview(space: space.id, look: space.look, strength: space.washStrength,
+                                                            grain: SpaceGrain(amount).amount))
+                } else {
+                    LookDraft.shared.end { browser.setSpaceGrain(browser.spaceID, to: amount) }
+                }
             case "strength":
                 // The picker's Strength: subtle, rich or vivid.
                 let name = request["strength"] as? String ?? ""
@@ -4141,8 +4199,23 @@ final class Bench {
                 // Each space's own colour and gradient, as kept.
                 "looks": browser.spaces.map { space -> [String: Any] in
                     ["name": space.name, "colour": space.colour, "gradient": space.gradient?.colours ?? [],
-                     "strength": space.washStrength.rawValue]
+                     "strength": space.washStrength.rawValue, "grain": space.grainAmount]
                 },
+                // The grain over the wash as drawn, and how much of the tile
+                // shows in a light and a dark window.
+                "grain": browser.washGrain,
+                "grainShows": ["light": browser.washStrength.grain(browser.washGrain, dark: false),
+                               "dark": browser.washStrength.grain(browser.washGrain, dark: true)],
+                // What a drag on the wheel or the grain shows on the window
+                // before it is let go (LookDraft), and how many looks drags
+                // have shown.
+                "draft": { () -> Any in
+                    guard let held = LookDraft.shared.preview(for: browser.washSpace) else { return "" }
+                    var out: [String: Any] = ["grain": held.grain, "name": held.look?.name ?? ""]
+                    if case .gradient(let gradient)? = held.look { out["colours"] = gradient.colours }
+                    return out
+                }(),
+                "drafted": LookDraft.shared.shown,
                 // The Colour… picker as it would open on the space on screen
                 // (SpaceLookPicker): what is ringed and the preview's name.
                 "picker": { () -> [String: Any] in
@@ -4153,7 +4226,14 @@ final class Bench {
                     case .preset(let at): (kind, ringed) = ("gradient", SpaceGradient.presets[at].name)
                     case .custom: (kind, ringed) = ("custom", "")
                     }
-                    return ["kind": kind, "ringed": ringed, "preview": browser.space.lookName,
+                    // The wheel's handles: their colours, and where they sit.
+                    let handles = browser.space.wheelColours.map { hex -> [String: Any] in
+                        let at = ColourWheel.point(for: hex) ?? .zero
+                        return ["hex": hex, "x": Double(at.x), "y": Double(at.y)]
+                    }
+                    return ["kind": kind, "ringed": ringed, "preview": browser.space.lookName, "handles": handles,
+                            "angle": browser.space.gradient?.angle ?? SpaceGradient.defaultAngle,
+                            "snaps": ColourWheel.snaps.map { ["hex": $0.hex, "x": Double($0.point.x), "y": Double($0.point.y)] },
                             "strength": browser.space.washStrength.name, "strengths": SpaceStrength.allCases.map(\.name),
                             "colours": ["None"] + Spaces.colourNames.dropFirst(), "presets": SpaceGradient.presets.map(\.name)]
                 }(),

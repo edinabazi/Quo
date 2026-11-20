@@ -518,7 +518,7 @@ struct ContentView: View {
             // As cards, the column, the bookmarks bar and the gaps around the
             // page share that ground, so the space's colour washes all of it
             // alike. Edge to edge the column and the strip bring their own.
-            if cards { SpaceWash(look: browser.wash) }
+            if cards { SpaceWash(look: browser.wash, space: browser.washSpace) }
 
             // One stage, always. It starts beside the column and under the
             // strip, not behind them — a page sliding beneath floating chrome
@@ -927,6 +927,8 @@ struct ContentView: View {
             .environment(\.washRoom, CGSize(width: across, height: tall))
             // And as strongly, Subtle, Rich or Vivid, as the space on screen asks.
             .environment(\.washStrength, browser.washStrength)
+            // And its grain, if it has any.
+            .environment(\.washGrain, browser.washGrain)
             // The field comes on its spring, and goes quickly: once Return
             // is pressed the page is on its way, and the field is not what
             // there is to watch.
