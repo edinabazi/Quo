@@ -18,6 +18,7 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Habits from Arc and Chrome
 
+- **Another browser's profiles and extensions come over too**: Bring Things Over, in the onboarding and in Settings, now offers Profiles and Extensions beside passwords, bookmarks and history, each with a count. Every profile of Chrome, Dia, Arc, Brave, Edge, Vivaldi, Firefox, Zen and the rest comes into a profile of the same name here with its own bookmarks and history (its first into the window you're in, one with nothing in it left out, one already here found by name). Its extensions are installed fresh from the Chrome Web Store, with names, one question each, and a line saying what was installed, not wanted, or refused and why. What can't come is named with the reason: themes, ones turned off, built-in, loaded from a folder, put there by a policy, or from another store; Firefox's add-ons and Safari's extensions are listed with a link to look for each in the Chrome Web Store. Before, one profile at a time came into the window's own, and extensions came as a bare count with nothing said of the ones left behind. *Nov 2026*
 - **Downloads as cards in the column**, as in Arc: progress and time left while they come in, then the file itself, to open, show in Finder or drag out to another app. Search had a small ring in the column's foot. *Nov 2026*
 - **Arc's habits on from the start**: spaces, ⌘T's floating field with recent places and commands, pinned rows and folders in them. Search has them all but starts with them off. *Nov 2026*
 - **A pin keeps its site, and what leaves it opens in a new tab**: a link in a pin to another site, or another site's address typed into it, opens a new tab beside it, as Dia does, and the pin stays where it was. Search opened such links in a Peek over the pin, which is still a choice (Settings › Spaces & Pins). *Nov 2026*
@@ -43,5 +44,6 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Fixes
 
+- **Bring Things Over finds Chrome on a Mac where it is the only browser**: recent macOS keeps Chrome's data folder from other apps until you allow it, and the onboarding then said no other browser was on the Mac at all. It now names Chrome (or any browser macOS keeps this way, wherever its app is) with an Allow Access button that opens its folder for one click, and Settings points to Full Disk Access for good. *Nov 2026*
 - **Extension badges sit in the middle**: a count was a little low and off to one side, and three or four characters made a wide slab across the icon. Now a circle for one character, a short capsule for more, in a condensed cut for three or four, cut at four as Chrome does. *Nov 2026*
 - **A page from the small window for links keeps its address**: Open in Quo moved it into the row with an empty address bar until it was reloaded, and the small window's own bar never named the site. *Nov 2026*
