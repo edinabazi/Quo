@@ -62,6 +62,9 @@ esac
 # (Store.name, Store.home): ./quo.sh builds Quo this way.
 NAME="${SEARCH_NAME:-Search}"
 BUNDLE_ID="${SEARCH_BUNDLE_ID:-com.officecommun.search}"
+# Where a fork's "Found something wrong?" goes (SEARCH_FEEDBACK, a page such
+# as its own issues): Search's own goes to Office Commun by email.
+FEEDBACK="${SEARCH_FEEDBACK:-}"
 APP="$OUT/$NAME.app"
 # Asked for with SEARCH_DEV=1, a dev build, on a yellow plate and named for
 # the feature it's built from: "Search-split-view" in the menu bar, the Dock
@@ -217,6 +220,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
   <key>SearchFolderName</key><string>$NAME</string>
   <key>SearchHomeIdentifier</key><string>$BUNDLE_ID</string>
+  <key>SearchFeedback</key><string>$FEEDBACK</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>

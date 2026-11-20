@@ -435,6 +435,13 @@ final class Links: NSObject, NSApplicationDelegate {
     /// Mail, that already knows what build this is. The person still reads
     /// it and presses send themselves — nothing here sends anything.
     static func writeFeedback() {
+        // A fork's own page for it (build.sh, SEARCH_FEEDBACK): its issues,
+        // in a tab, not an email to the people who made Search.
+        if let page = Bundle.main.object(forInfoDictionaryKey: "SearchFeedback") as? String, !page.isEmpty,
+           let url = URL(string: page) {
+            MainActor.assumeIsolated { Browsers.ensureWindow().open(url, foreground: true) }
+            return
+        }
         var text = URLComponents()
         text.scheme = "mailto"
         text.path = "hello@officecommun.com"

@@ -107,7 +107,7 @@ struct AgentLauncher: Equatable {
 // MARK: - the signature
 
 enum AgentIdentity {
-    static let log = Logger(subsystem: "com.officecommun.search", category: "Agent")
+    static let log = Logger(subsystem: Store.home, category: "Agent")
 
     /// The audit token of the process at the other end of a Unix socket: the
     /// process that connected, as the kernel knows it (pid and its version).
@@ -278,7 +278,7 @@ struct KeychainVault: AgentVault {
         return value as? String
     }()
 
-    static let agents = KeychainVault(service: "com.officecommun.search.agents.trusted",
+    static let agents = KeychainVault(service: "\(Store.home).agents.trusted",
                                       account: Store.world.map { "trusted (\($0))" } ?? "trusted")
 
     private var query: [String: Any] {

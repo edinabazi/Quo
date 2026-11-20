@@ -526,7 +526,8 @@ enum SettingsIndex {
               title: "Install updates on its own", detail: "Off, \(Store.name) tells you and waits for Install",
               keys: [Updater.installKey], words: ["automatic updates"]),
         .init(id: "about.feedback", group: "updates", icon: "envelope",
-              title: "Found something wrong?", detail: "Opens a draft with the version already in it", words: ["bug", "feedback", "report"]),
+              title: "Found something wrong?", detail: (Bundle.main.object(forInfoDictionaryKey: "SearchFeedback") as? String ?? "").isEmpty
+                  ? "Opens a draft with the version already in it" : "Opens a new issue on GitHub", words: ["bug", "feedback", "report"]),
         .init(id: "about.notes", group: "updates", icon: "sparkles",
               title: "What's new", detail: "Every version's notes, newest first", words: ["release notes", "changelog"]),
         .init(id: "bench", group: "developer", icon: "terminal",
@@ -640,6 +641,8 @@ enum SettingsIndex {
         case "links.peek.stays": return prefs.peeksLinks || prefs.pinsPeek
         case "launcher.key": return prefs.launcher
         case "shield.lists": return prefs.shielded
+        // Only Search's own releases update themselves: a fork is built again.
+        case "updates.version", "updates.auto": return Updater.official
         default: return true
         }
     }
@@ -654,6 +657,7 @@ enum SettingsIndex {
         case "profiles.oneWindow": return "Only with more than one profile"
         case "spaces.links": return "Only with Spaces on"
         case "sidebar.player": return "Only with titles in the sidebar"
+        case "updates.version", "updates.auto": return "\(Store.name) is updated by building it again"
         case "tabs.frontBeside": return "Only with New tab position on After current"
         case "newtab.recent": return "Only with the new tab in a floating field"
         case "links.little.tabs": return "Only with links from other apps in a small window"

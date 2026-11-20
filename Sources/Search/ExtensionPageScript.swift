@@ -144,7 +144,7 @@ enum ExtensionPageScript {
         let strict = source.range(of: #"^\s*(?:(?://[^\n]*\n|/\*[\s\S]*?\*/)\s*)*(["'])use strict\1"#, options: .regularExpression) != nil
         let quoted = (try? JSONSerialization.data(withJSONObject: [expected], options: [.withoutEscapingSlashes]))
             .flatMap { String(data: $0, encoding: .utf8) }.map { String($0.dropFirst().dropLast()) } ?? "\"\""
-        let name = "search-page-script-" + token
+        let name = "\(ExtensionShims.prefix)-page-script-" + token
         return (strict ? "\"use strict\";" : "") + """
         (() => {
           if (location.origin + location.pathname + location.search !== \(quoted)) throw "\(movedMarker)";

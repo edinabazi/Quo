@@ -27,28 +27,52 @@ import CryptoKit
 enum ExtensionShims {
     /// The name native messages to the browser itself go to.
     static let application = "search"
-    nonisolated static let file = "search-shim.js"
+    /// What the files and marks it leaves in an extension are named for:
+    /// "search", or "quo" in Quo.
+    nonisolated static let prefix: String = {
+        let name = Store.name.lowercased()
+        return !name.isEmpty && name.allSatisfy({ $0.isASCII && $0.isLetter }) ? name : "search"
+    }()
+    nonisolated static let file = "\(prefix)-shim.js"
     /// What content scripts carry instead: the shim up to the point where a
     /// content script's run of it returns, so the same code with nothing
     /// after it. A frame parses whatever its content scripts carry, every
     /// time it loads, once for each entry that names it; the whole shim is
     /// 230 KB, almost all of it for the worker and the extension's pages,
     /// and a content script never runs a line of that part (see contentShim).
-    nonisolated static let contentFile = "search-shim-content.js"
-    nonisolated static let contentEnd = "/* Search: a content script's shim ends here */"
+    nonisolated static let contentFile = "\(prefix)-shim-content.js"
+    nonisolated static let contentEnd = "/* \(Store.name): a content script's shim ends here */"
     /// Search's passkey patch, put first in every script an extension runs in
     /// a page's own world (see Passkeys.swift, and `first` in the script).
-    nonisolated static let passkeys = "search-passkeys.js"
+    nonisolated static let passkeys = "\(prefix)-passkeys.js"
     /// The first line of a worker that already carries the shim.
-    nonisolated static let marker = "/* Search: Chrome APIs WebKit lacks, filled in (ExtensionShims.swift) */"
-    nonisolated static let ender = "/* Search: end of shim */"
+    nonisolated static let marker = "/* \(Store.name): Chrome APIs WebKit lacks, filled in (ExtensionShims.swift) */"
+    nonisolated static let ender = "/* \(Store.name): end of shim */"
+
+    /// What a fork's extensions carry from before it took its own name
+    /// ("search-shim.js" and the rest), each with what it is called now.
+    /// Rewritten to the new names before an extension is prepared again, so
+    /// the old shim is found and replaced rather than run beside the new.
+    /// The old files are left where they are, for anything still naming one.
+    nonisolated static let renamed: [(old: String, new: String)] = prefix == "search" ? [] : [
+        ("search-shim-content.js", contentFile), ("search-passkeys.js", passkeys), ("search-shim.js", file),
+        ("/* Search: a content script's shim ends here */", contentEnd),
+        ("/* Search: Chrome APIs WebKit lacks, filled in (ExtensionShims.swift) */", marker),
+        ("/* Search: end of shim */", ender),
+    ]
+    nonisolated static func renaming(_ text: String) -> String {
+        renamed.reduce(text) { text, pair in text.replacingOccurrences(of: pair.old, with: pair.new) }
+    }
 
     // MARK: - at install
 
     /// Written beside a prepared extension: which shim it carries. The same
     /// one needs nothing redone, which matters at launch — preparing reads
     /// every script and page an extension ships.
-    nonisolated static let stamp = ".search-shim"
+    nonisolated static let stamp = ".\(prefix)-shim"
+    /// Which permissions preparing added, so they aren't taken for the
+    /// extension's own.
+    nonisolated static let added = ".\(prefix)-added"
     /// Raised when `prepare` changes what it does to a package, so that
     /// extensions prepared before are prepared again.
     nonisolated private static let preparation = "6"
@@ -63,14 +87,22 @@ enum ExtensionShims {
     nonisolated static func prepare(_ folder: URL, fresh: Bool = false, workerGeneration: Int = 0) throws {
         let files = FileManager.default
         if fresh {
-            for name in [stamp, ".search-added"] { try? files.removeItem(at: folder.appendingPathComponent(name)) }
+            for name in [stamp, added, ".search-shim", ".search-added"] { try? files.removeItem(at: folder.appendingPathComponent(name)) }
         }
         let stampURL = folder.appendingPathComponent(stamp)
         let revision = version + "-worker-\(workerGeneration)"
         if (try? String(contentsOf: stampURL, encoding: .utf8)) == revision { return }
         defer { try? revision.write(to: stampURL, atomically: true, encoding: .utf8) }
         let manifestURL = folder.appendingPathComponent("manifest.json")
-        guard var manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any]
+        // A fork's extension prepared under the old names: the manifest read
+        // with the new ones, and what preparing added carried over.
+        let addedURL = folder.appendingPathComponent(added)
+        if !renamed.isEmpty, !files.fileExists(atPath: addedURL.path),
+           files.fileExists(atPath: folder.appendingPathComponent(".search-added").path) {
+            try? files.copyItem(at: folder.appendingPathComponent(".search-added"), to: addedURL)
+        }
+        let manifestText = renaming(try String(contentsOf: manifestURL, encoding: .utf8))
+        guard var manifest = try JSONSerialization.jsonObject(with: Data(manifestText.utf8)) as? [String: Any]
         else { throw Crx.Refused.unpack }
 
         let script = shim(for: folder).replacingOccurrences(of: "__SEARCH_WORKER_GENERATION__", with: String(workerGeneration))
@@ -84,14 +116,14 @@ enum ExtensionShims {
         // described by what it asked for, not by what Search gave it.
         var permissions = manifest["permissions"] as? [Any] ?? []
         let asked = Set(permissions.compactMap { $0 as? String })
-        var added = (try? JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent(".search-added")))) as? [String] ?? []
+        var added = (try? JSONSerialization.jsonObject(with: Data(contentsOf: addedURL))) as? [String] ?? []
         for needed in ["nativeMessaging"] + (asked.contains("userScripts") ? ["scripting"] : []) where !asked.contains(needed) {
             permissions.append(needed)
             added.append(needed)
         }
         manifest["permissions"] = permissions
         if let data = try? JSONSerialization.data(withJSONObject: Array(Set(added)).sorted()) {
-            try? data.write(to: folder.appendingPathComponent(".search-added"))
+            try? data.write(to: addedURL)
         }
 
         // The background, whichever kind it is, gets the shim first. A
@@ -104,7 +136,7 @@ enum ExtensionShims {
             if let worker = background["service_worker"] as? String { unlink(worker, in: folder) }
             if let worker = background["service_worker"] as? String,
                let path = inside(worker, of: folder) {
-                if var source = try? String(contentsOf: path, encoding: .utf8) {
+                if var source = (try? String(contentsOf: path, encoding: .utf8)).map(renaming) {
                     // Already carrying one: take the old one off, so a newer
                     // Search puts its newer shim in its place.
                     if source.hasPrefix(marker), let end = source.range(of: ender) {
@@ -259,6 +291,12 @@ enum ExtensionShims {
             guard ["html", "htm"].contains(url.pathExtension.lowercased()),
                   var html = try? String(contentsOf: url, encoding: .utf8)
             else { continue }
+            // The old name's tag, if it has one, becomes the new name's.
+            let renamedHTML = renaming(html)
+            if renamedHTML != html {
+                html = renamedHTML
+                try? html.write(to: url, atomically: true, encoding: .utf8)
+            }
             if let chained = chainModules(html, page: url, folder: folder) {
                 html = chained
                 try? html.write(to: url, atomically: true, encoding: .utf8)
@@ -372,7 +410,7 @@ enum ExtensionShims {
             if text.range(of: #"\bawait\b"#, options: .regularExpression) != nil { awaits = true }
         }
         guard awaits else { return nil }
-        let name = "search-modules-" + page.deletingPathExtension().lastPathComponent + ".js"
+        let name = "\(prefix)-modules-" + page.deletingPathExtension().lastPathComponent + ".js"
         let imports = found.map { entry -> String in
             let spec = entry.src.hasPrefix("/") || entry.src.hasPrefix("./") || entry.src.hasPrefix("../") ? entry.src : "./" + entry.src
             return "import \"\(spec.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\";"
@@ -665,7 +703,7 @@ enum ExtensionShims {
           const path = new URL(address).pathname;
           // The browser's script asks for its element by an event; this
           // world hands it over by dispatching on the element itself.
-          const name = "search-page-script-" + token;
+          const name = "\#(prefix)-page-script-" + token;
           const handOver = () => element.dispatchEvent(new Event(name));
           document.addEventListener(name + "-ask", handOver);
           const done = (ran) => {
@@ -860,7 +898,7 @@ enum ExtensionShims {
       // over with a message can't cross the channel: it stays with the
       // sender, and what is posted to the one the other side is given comes
       // back over the channel to it.
-      const clientsChannel = typeof BroadcastChannel === "function" && !inContent && !embedded ? new BroadcastChannel("search-clients") : null;
+      const clientsChannel = typeof BroadcastChannel === "function" && !inContent && !embedded ? new BroadcastChannel("\#(prefix)-clients") : null;
       const heldPorts = new Map();
       const handOver = (transfer) => (Array.isArray(transfer) ? transfer : (transfer && transfer.transfer) || [])
         .filter((p) => p instanceof MessagePort)
@@ -884,7 +922,7 @@ enum ExtensionShims {
       if (worker && clientsChannel && root.clients && typeof root.clients.matchAll === "function") {
         const matchAll = root.clients.matchAll.bind(root.clients);
         const client = (p) => ({
-          id: "search-" + p.id, url: p.url, type: "window", frameType: "top-level",
+          id: "\#(prefix)-" + p.id, url: p.url, type: "window", frameType: "top-level",
           visibilityState: p.visible ? "visible" : "hidden", focused: !!p.focused,
           postMessage: (data, transfer) => { try { clientsChannel.postMessage({ url: p.url, data, ports: handOver(transfer) }); } catch (e) {} },
           focus() { return Promise.resolve(this); },
@@ -1348,7 +1386,7 @@ enum ExtensionShims {
       // as long as someone else may still answer (see the end of `dispatch`).
       // A page in a website's frame is on the website's side of the
       // channel and takes no part; it waits, as before.
-      const channel = !inContent && !embedded && typeof BroadcastChannel === "function" ? new BroadcastChannel("search-messages") : null;
+      const channel = !inContent && !embedded && typeof BroadcastChannel === "function" ? new BroadcastChannel("\#(prefix)-messages") : null;
       const me = Math.random().toString(36).slice(2);
       const peers = new Set();
       const verdicts = new Map();
@@ -1920,7 +1958,7 @@ enum ExtensionShims {
         }
         return;
       }
-      /* Search: a content script's shim ends here */
+      /* \#(Store.name): a content script's shim ends here */
 
       // An extension's page framed in a website, as Vimium's Vomnibar is:
       // its content script focuses the frame on a key press, and the page
@@ -2404,7 +2442,7 @@ enum ExtensionShims {
       // it can't: a rejection, or lastError for a callback.
       const refuse = (what) => (...args) => {
         const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
-        const error = new Error(what + " isn't available in Search");
+        const error = new Error(what + " isn't available in \#(Store.name)");
         if (!callback) return Promise.reject(error);
         withLastError(error, callback);
       };
@@ -2572,7 +2610,7 @@ enum ExtensionShims {
           // The sound of a screen or a tab alone: WebKit records none.
           if (desktopId(c.video) === null) {
             stream.getTracks().forEach((t) => t.stop());
-            throw new DOMException("Search can't record the sound of a screen or a tab", "NotFoundError");
+            throw new DOMException("\#(Store.name) can't record the sound of a screen or a tab", "NotFoundError");
           }
           const [track] = stream.getVideoTracks();
           const want = displayVideo(c.video);
@@ -2892,7 +2930,7 @@ enum ExtensionShims {
         const action = manifest.action || manifest.browser_action || {};
         let popupPath = null;
         try { if (typeof action.default_popup === "string" && action.default_popup) popupPath = new URL(action.default_popup, location.origin + "/").pathname; } catch (e) {}
-        const relay = popupPath && !embedded && typeof BroadcastChannel === "function" ? new BroadcastChannel("search-storage") : null;
+        const relay = popupPath && !embedded && typeof BroadcastChannel === "function" ? new BroadcastChannel("\#(prefix)-storage") : null;
         if (relay && background && chrome.storage && chrome.storage.onChanged) {
           kept.add(chrome.storage.onChanged);
           chrome.storage.onChanged.addListener((changes, area) => {
@@ -3772,11 +3810,13 @@ enum ExtensionShims {
         const first = (scripts, updating) => Array.isArray(scripts) ? scripts.map((s) => {
           if (!s || !Array.isArray(s.js)) return s;
           const world = String(s.world || "").toUpperCase();
-          const before = world === "MAIN" ? ["search-passkeys.js"]
-            : updating && !world ? ["search-passkeys.js", "search-shim-content.js"] : ["search-shim-content.js"];
+          const before = world === "MAIN" ? ["\#(passkeys)"]
+            : updating && !world ? ["\#(passkeys)", "\#(contentFile)"] : ["\#(contentFile)"];
           // An older Search's whole shim, named by a registration it kept,
-          // gives way to the content script's part of it.
-          const js = s.js.filter((file) => file !== "search-shim.js");
+          // gives way to the content script's part of it; so do the old
+          // names of a fork's, before it took its own.
+          const old = new Set(["search-shim.js", "\#(file)", "search-shim-content.js", "search-passkeys.js"]);
+          const js = s.js.filter((file) => !old.has(file) || before.includes(file));
           return { ...s, js: [...before.filter((file) => !js.includes(file)), ...js] };
         }) : scripts;
         for (const name of ["registerContentScripts", "updateContentScripts"]) {

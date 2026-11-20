@@ -529,7 +529,7 @@ private final class PanelDelegate: NSObject, WKNavigationDelegate, WKUIDelegate 
 
     /// Its web process gone: the page is made again where it was.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        if loaded { webView.reload() } else { fellThrough(NSError(domain: "Search", code: 1)) }
+        if loaded { webView.reload() } else { fellThrough(NSError(domain: Store.name, code: 1)) }
     }
 
     /// The same rule as tabs.create and a popup's links: never a file on

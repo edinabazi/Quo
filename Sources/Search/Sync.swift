@@ -22,7 +22,7 @@ import SystemConfiguration
 //
 // Off unless turned on (Settings › General › Sync with your other Macs).
 //
-// In the folder, "Search Sync/<scope>/<device>.json": one file per Mac per
+// In the folder, "<name> Sync/<scope>/<device>.json" ("Quo Sync" in Quo): one file per Mac per
 // scope, written only by that Mac, so two Macs never write the same file.
 // The scopes: "app" for the settings below, and "profile-<id>" for each
 // profile's spaces, pins and bookmarks — a profile's never mixes with
@@ -128,8 +128,11 @@ final class Sync: ObservableObject {
 
     nonisolated static let folderKey = "sync.folder"
     nonisolated static let deviceKey = "sync.device"
-    /// The folder Search makes inside the one chosen.
-    nonisolated static let inside = "Search Sync"
+    /// The folder the app makes inside the one chosen, named for it:
+    /// "Search Sync", or "Quo Sync" in Quo.
+    nonisolated static let inside = "\(Store.name) Sync"
+    /// What a fork's folder was called before it took the app's name.
+    nonisolated static let former = "Search Sync"
 
     /// This Mac's id in the folder: made once, kept with the settings, so
     /// each test world (SEARCH_PROBE=<name>) is a Mac of its own.
@@ -233,7 +236,23 @@ final class Sync: ObservableObject {
 
     // MARK: - where
 
-    private var root: URL? { folder?.appendingPathComponent(Sync.inside, isDirectory: true) }
+    private var root: URL? {
+        guard let folder else { return nil }
+        let root = folder.appendingPathComponent(Sync.inside, isDirectory: true)
+        Sync.carryOver(to: root, in: folder)
+        return root
+    }
+
+    /// A fork's folder, made as "Search Sync" before it took the app's name,
+    /// moved to its own name once, with everything in it: never while one
+    /// of the new name is already there, and never in Search itself.
+    nonisolated static func carryOver(to root: URL, in folder: URL) {
+        guard inside != former else { return }
+        let old = folder.appendingPathComponent(former, isDirectory: true)
+        let files = FileManager.default
+        guard !files.fileExists(atPath: root.path), files.fileExists(atPath: old.path) else { return }
+        try? files.moveItem(at: old, to: root)
+    }
 
     private var scopes: [String] { ["app"] + Profiles.shared.list.map { Sync.scope($0.id) } }
 

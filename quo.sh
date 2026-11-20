@@ -15,6 +15,7 @@ cd "$(dirname "$0")"
 # Tinted styles. On a Mac without Icon Composer, the older mark instead: a
 # soft tile with a Q cut out (Icon/quo-mark.svg), drawn by Icon/icon.swift.
 SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_ICON=Icon/Quo.icon \
+  SEARCH_FEEDBACK=https://github.com/edinabazi/Quo/issues/new \
   SEARCH_MARK=Icon/quo-mark.svg SEARCH_MARK_FRACTION=0.56 ./build.sh release app
 if [ "${1:-}" = "install" ]; then
   osascript -e 'tell application id "com.edinabazi.quo" to quit' 2>/dev/null || true

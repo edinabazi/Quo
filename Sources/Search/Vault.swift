@@ -45,7 +45,8 @@ struct Kept: Identifiable, Equatable, Hashable {
 enum Vault {
     /// What every item of ours is tagged with. A test run tags its own, so a
     /// password saved while trying something never sits among the real ones.
-    private static let label = Store.world.map { "Search (\($0))" } ?? "Search"
+    /// The app's own name, so Quo's are its own and not Search's.
+    private static let label = Store.world.map { "\(Store.name) (\($0))" } ?? Store.name
 
     // MARK: - reading
 
