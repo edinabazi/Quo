@@ -34,3 +34,7 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 ## Video
 
 - **A floating live stream fills its window**: YouTube's live player sat a quarter size in the window's corner. *Nov 2026*
+
+## Fixes
+
+- **A page from the small window for links keeps its address**: Open in Quo moved it into the row with an empty address bar until it was reloaded, and the small window's own bar never named the site. *Nov 2026*

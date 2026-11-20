@@ -61,7 +61,12 @@ final class SyncCloud {
         return URL(fileURLWithPath: path, isDirectory: true)
     }()
 
-    nonisolated static var available: Bool { fakeFolder != nil || (containerID != nil && !Store.testing) }
+    /// A test run reaches the real iCloud only when asked to
+    /// (SEARCH_REAL_CLOUD=1, with a build signed for the container): a
+    /// probe never writes into somebody's iCloud by accident.
+    nonisolated static var realInTests: Bool { ProcessInfo.processInfo.environment["SEARCH_REAL_CLOUD"] == "1" }
+
+    nonisolated static var available: Bool { fakeFolder != nil || (containerID != nil && (!Store.testing || realInTests)) }
 
     nonisolated static let zoneName = "Sync"
     nonisolated static let recordType = "SyncFile"

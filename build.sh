@@ -65,6 +65,11 @@ BUNDLE_ID="${SEARCH_BUNDLE_ID:-com.officecommun.search}"
 # Where a fork's "Found something wrong?" goes (SEARCH_FEEDBACK, a page such
 # as its own issues): Search's own goes to Office Commun by email.
 FEEDBACK="${SEARCH_FEEDBACK:-}"
+# A fork with updates of its own (SEARCH_FEED_URL, its appcast.json, and
+# SEARCH_FEED_TEAM, the team that signs the fork and its feed): both go in
+# the plist, where Updater looks. Without them a fork doesn't update itself.
+FEEDURL="${SEARCH_FEED_URL:-}"
+FEEDTEAM="${SEARCH_FEED_TEAM:-}"
 APP="$OUT/$NAME.app"
 # Asked for with SEARCH_DEV=1, a dev build, on a yellow plate and named for
 # the feature it's built from: "Search-split-view" in the menu bar, the Dock
@@ -98,10 +103,11 @@ if [ "$DEV" = 1 ]; then
     *) SHOWN="$NAME-$FEATURE" ;;
   esac
 fi
-VERSION="$(tr -d '[:space:]' < VERSION)"
+# A fork numbers its own releases (SEARCH_VERSION; quo.sh reads QUO_VERSION).
+VERSION="${SEARCH_VERSION:-$(tr -d '[:space:]' < VERSION)}"
 # A build number that only ever goes up, so the updater can tell newer from
 # older without parsing version strings.
-BUILD="$(date +%Y%m%d%H%M)"
+BUILD="${SEARCH_BUILD:-$(date +%Y%m%d%H%M)}"
 # The oldest macOS this runs on — in the plist, and in the appcast so an
 # older Mac is not handed a build it can't open.
 MINIMUM="14.0"
@@ -221,6 +227,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>SearchFolderName</key><string>$NAME</string>
   <key>SearchHomeIdentifier</key><string>$BUNDLE_ID</string>
   <key>SearchFeedback</key><string>$FEEDBACK</string>
+  <key>SearchFeed</key><string>$FEEDURL</string>
+  <key>SearchFeedTeam</key><string>$FEEDTEAM</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>
@@ -336,7 +344,7 @@ ENTITLEMENTS="Search.entitlements"
 # A release that ships without it loses passkeys and the keychain items the
 # entitled builds saved (1.0.6, build 202610241534, went out that way from a
 # worktree the git-ignored profile hadn't been copied into): ship refuses.
-if [ "$STEP" = "ship" ] && [ ! -f "Search.provisionprofile" ] && [ -z "${SEARCH_ALLOW_NO_PASSKEYS:-}" ]; then
+if [ "$STEP" = "ship" ] && [ -z "${SEARCH_PROFILE:-}" ] && [ ! -f "Search.provisionprofile" ] && [ -z "${SEARCH_ALLOW_NO_PASSKEYS:-}" ]; then
   echo "ship: Search.provisionprofile is missing here (it's git-ignored: copy it from the main checkout)" >&2
   exit 1
 fi
@@ -423,8 +431,9 @@ echo "packed: $ZIP"
 BASE="${SEARCH_DOWNLOAD_URL:-https://officecommun.com/search}"
 BASE="${BASE%/}$SUBFOLDER"
 NOTES=""
-if [ -f NOTES.md ]; then
-  NOTES="$(awk 'NF { printf "%s%s", (n++ ? " " : ""), $0; next } n { exit }' NOTES.md \
+NOTESFILE="${SEARCH_NOTES:-NOTES.md}"
+if [ -f "$NOTESFILE" ]; then
+  NOTES="$(awk 'NF { printf "%s%s", (n++ ? " " : ""), $0; next } n { exit }' "$NOTESFILE" \
     | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 fi
 # The AI add-on's engine (engine.sh), when this release offers one: Apple
@@ -474,7 +483,7 @@ JSON
     local SIGNED
     SIGNED="$(mktemp -d)"
     cp "$OUT/appcast.json" "$SIGNED/appcast.json"
-    codesign --force --timestamp --sign "$IDENTITY" --identifier com.officecommun.search.appcast "$SIGNED/appcast.json"
+    codesign --force --timestamp --sign "$IDENTITY" --identifier "$BUNDLE_ID.appcast" "$SIGNED/appcast.json"
     ditto -c -k --sequesterRsrc "$SIGNED/appcast.json" "$OUT/appcast.json.zip"
     rm -rf "$SIGNED"
     echo "signed: $OUT/appcast.json.zip"

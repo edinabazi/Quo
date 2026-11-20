@@ -8674,6 +8674,10 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
             // the one in Settings, as a tab does: neither is in the row,
             // and both opened at 100% (#691).
             if let page = peekTab?.built === webView ? peekTab : littleTab(for: webView) {
+                // Its page has arrived, as a tab's does: the site its bar
+                // names, and the address the row's bar shows once Open in
+                // Quo moves it there, both go by it (Tab.committed).
+                page.didCommit()
                 page.applyRememberedZoom()
             }
             return

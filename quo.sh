@@ -2,8 +2,10 @@
 # Quo: this fork of Search, built under its own name and bundle id, so it
 # keeps its own data, settings and WebKit storage beside an installed Search.
 #
-#   ./quo.sh              build build/Quo.app
-#   ./quo.sh install      build it and put it in /Applications (quits Quo first)
+#   ./quo.sh                  build build/Quo.app
+#   ./quo.sh install          build it and put it in /Applications (quits Quo first)
+#   ./quo.sh release [0.1.1]  build, notarise and publish a release on GitHub,
+#                             which every installed Quo then updates itself to
 #
 # Data lives in ~/Library/Application Support/Quo, the defaults under
 # com.edinabazi.quo, cookies and site data in WebKit's container for that id.
@@ -21,9 +23,54 @@ cd "$(dirname "$0")"
 if [ -f Quo.provisionprofile ]; then
   export SEARCH_PROFILE=Quo.provisionprofile SEARCH_ENTITLEMENTS=Quo.entitlements
 fi
-SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_ICON=Icon/Quo.icon \
-  SEARCH_FEEDBACK=https://github.com/edinabazi/Quo/issues/new \
-  SEARCH_MARK=Icon/quo-mark.svg SEARCH_MARK_FRACTION=0.56 ./build.sh release app
+# Updates: Search's own updater, reading Quo's feed instead of Office
+# Commun's. Each release is a GitHub release with Quo.zip, Quo.dmg and the
+# feed (appcast.json, and the copy signed with the Developer ID); "latest"
+# always points at the newest one, so the feed's address never changes.
+REPO="edinabazi/Quo"
+TEAM="8B6VFDJHA2"
+export SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_ICON=Icon/Quo.icon \
+  SEARCH_FEEDBACK="https://github.com/$REPO/issues/new" \
+  SEARCH_FEED_URL="https://github.com/$REPO/releases/latest/download/appcast.json" \
+  SEARCH_FEED_TEAM="$TEAM" SEARCH_NOTARY_PROFILE=quo SEARCH_NOTES=QUO_NOTES.md \
+  SEARCH_MARK=Icon/quo-mark.svg SEARCH_MARK_FRACTION=0.56
+# Quo's version, and what's new in it (QUO_NOTES.md, newest first, one
+# paragraph each: the first is the line under the version in Settings).
+export SEARCH_VERSION="$(tr -d '[:space:]' < QUO_VERSION)"
+
+if [ "${1:-}" = "release" ]; then
+  if [ -n "${2:-}" ]; then printf '%s\n' "$2" > QUO_VERSION; SEARCH_VERSION="$2"; fi
+  TAG="v$SEARCH_VERSION"
+  # What a release needs, checked before anything is built.
+  [ -f Quo.provisionprofile ] || { echo "release: Quo.provisionprofile is missing — without it Quo ships without iCloud" >&2; exit 1; }
+  xcrun notarytool history --keychain-profile quo >/dev/null 2>&1 \
+    || { echo "release: no notarytool profile \"quo\" — run: xcrun notarytool store-credentials quo --apple-id <you> --team-id $TEAM" >&2; exit 1; }
+  gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 \
+    && { echo "release: $TAG is out already — ./quo.sh release <next version>" >&2; exit 1; }
+  [ -z "$(git status --porcelain)" ] || { echo "release: commit first — a release is built from what's committed" >&2; exit 1; }
+  git fetch -q origin
+  git merge-base --is-ancestor HEAD "origin/$(git rev-parse --abbrev-ref HEAD)" \
+    || { echo "release: push first — the release's tag goes on this commit" >&2; exit 1; }
+  SEARCH_DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG" ./build.sh release ship
+  # The signed feed has to hold up before it goes out: a broken one stops
+  # every Quo's updates without a word.
+  CHECK="$(mktemp -d)"
+  ditto -x -k build/appcast.json.zip "$CHECK"
+  codesign --verify -R="anchor apple generic and identifier \"com.edinabazi.quo.appcast\" and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = \"$TEAM\"" "$CHECK/appcast.json" \
+    || { rm -rf "$CHECK"; echo "release: the signed feed doesn't verify — not publishing" >&2; exit 1; }
+  cmp -s "$CHECK/appcast.json" build/appcast.json || { rm -rf "$CHECK"; echo "release: the signed feed isn't build/appcast.json" >&2; exit 1; }
+  rm -rf "$CHECK"
+  NOTESFILE="$(mktemp)"
+  awk 'NF { print; n++; next } n { exit }' QUO_NOTES.md > "$NOTESFILE"
+  gh release create "$TAG" --repo "$REPO" --target "$(git rev-parse HEAD)" --latest \
+    --title "Quo $SEARCH_VERSION" --notes-file "$NOTESFILE" \
+    build/Quo.dmg build/Quo.zip build/appcast.json build/appcast.json.zip
+  rm -f "$NOTESFILE"
+  echo "released: Quo $SEARCH_VERSION — https://github.com/$REPO/releases/tag/$TAG"
+  exit 0
+fi
+
+./build.sh release app
 if [ "${1:-}" = "install" ]; then
   osascript -e 'tell application id "com.edinabazi.quo" to quit' 2>/dev/null || true
   sleep 1

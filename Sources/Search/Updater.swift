@@ -39,6 +39,8 @@ final class Updater: ObservableObject {
         if overridden, let set = ProcessInfo.processInfo.environment["SEARCH_FEED"], let url = URL(string: set) {
             return url
         }
+        // A fork with a feed of its own reads that one, and only that one.
+        if let own = ownFeed { return own }
         // An Intel Mac has a download of its own from 1.0.5 (build.sh,
         // SEARCH_ARCH=x86_64) and a feed beside it naming only Intel builds,
         // so neither kind of Mac is ever offered the other's.
@@ -113,6 +115,22 @@ final class Updater: ObservableObject {
     /// Search reads Office Commun's feed.
     nonisolated static var official: Bool { Store.home == "com.officecommun.search" }
 
+    /// A fork's own feed: SearchFeed in its plist (build.sh, SEARCH_FEED_URL),
+    /// https only, with the team that signs the fork and the feed beside it
+    /// (SearchFeedTeam). Quo's is its GitHub releases. Search itself never
+    /// reads one, whatever its plist says.
+    nonisolated static let ownFeed: URL? = {
+        guard !official,
+              let text = Bundle.main.object(forInfoDictionaryKey: "SearchFeed") as? String,
+              let url = URL(string: text), url.scheme == "https",
+              let team = Bundle.main.object(forInfoDictionaryKey: "SearchFeedTeam") as? String, !team.isEmpty
+        else { return nil }
+        return url
+    }()
+
+    /// Whether this build updates itself: Search, or a fork with a feed.
+    nonisolated static var updates: Bool { official || ownFeed != nil }
+
     nonisolated static var build: Int {
         Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "") ?? 0
     }
@@ -137,9 +155,10 @@ final class Updater: ObservableObject {
     func checkIfDue(then say: @escaping (String) -> Void) {
         self.say = say
         Swap.sweep()
-        // A fork is updated by whoever builds it: Office Commun's feed is
-        // for Search, and the team check would refuse its builds anyway.
-        guard Updater.official else { return }
+        // A fork without a feed of its own is updated by whoever builds it:
+        // Office Commun's feed is for Search, and the team check would
+        // refuse its builds anyway.
+        guard Updater.updates else { return }
         // And again every hour for as long as the app is up — a browser that
         // is left open for a week would otherwise never look.
         if clock == nil {
@@ -164,7 +183,7 @@ final class Updater: ObservableObject {
     /// Search › Check for Updates…: the result is said in the line at the
     /// foot of the window, and an available update is offered in the menu.
     func checkByHand() {
-        guard Updater.official else {
+        guard Updater.updates else {
             say?("\(Store.name) is your own build: it updates when you build it again")
             return
         }
@@ -190,7 +209,7 @@ final class Updater: ObservableObject {
     /// names, or nil when this is the latest; what becomes of it after that
     /// is said through the line handed to `checkIfDue`.
     func check(then done: @escaping (Release?) -> Void) {
-        guard Updater.official else { return done(nil) }
+        guard Updater.updates else { return done(nil) }
         guard !checking else { return }
         checking = true
         Task { [weak self] in
@@ -251,7 +270,8 @@ final class Updater: ObservableObject {
                     if Store.testing { Updater.diskVerdict = "verified" } else { NSWorkspace.shared.open(dmg) }
                 case .failure(let error):
                     Updater.diskVerdict = "refused: \(error)"
-                    say?("That download didn't check out — get Search from searchbrowser.app")
+                    say?(Updater.official ? "That download didn't check out — get Search from searchbrowser.app"
+                                         : "That download didn't check out")
                 }
             }
         }
@@ -377,8 +397,14 @@ final class Updater: ObservableObject {
     }
 
     /// The team that signs Search's releases, and with them its feed.
-    nonisolated static let team = "7BYKA895MC"
-    nonisolated static let feedIdentifier = "com.officecommun.search.appcast"
+    /// A fork with its own feed: the team that signs it (SearchFeedTeam).
+    nonisolated static let team: String = {
+        guard ownFeed != nil, let own = Bundle.main.object(forInfoDictionaryKey: "SearchFeedTeam") as? String
+        else { return "7BYKA895MC" }
+        return own
+    }()
+    /// build.sh signs the feed as the bundle id with ".appcast" after it.
+    nonisolated static var feedIdentifier: String { "\(Store.home).appcast" }
 
     /// The feed inside `packed`, if it is Office Commun's: appcast.json with
     /// a code signature (codesign keeps it in the file's extended attributes,
@@ -552,7 +578,7 @@ private enum Swap {
         guard let expected = release.dmgSha256 else { throw Refused.hash }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("search-disk-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let dmg = folder.appendingPathComponent("Search \(release.version).dmg")
+        let dmg = folder.appendingPathComponent("\(Store.name) \(release.version).dmg")
         try await download(release.dmg, to: dmg)
         guard try digest(of: dmg) == expected else { throw Refused.hash }
         var code: SecStaticCode?

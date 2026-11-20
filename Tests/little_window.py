@@ -86,6 +86,8 @@ try:
     little("keep"); time.sleep(0.5)
     st = little("look")
     t.ok("Open in Search moves the page into the row", "127.0.0.1" in st["tabs"] and st["littles"] == [], st)
+    kept = next(x for x in sv.cmd({"do": "tabs"})["tabs"] if x["active"])
+    t.ok("…and the address bar says where it is, with no reload", kept["atRest"].startswith("127.0.0.1") and kept["atRestShown"], kept)
 
     # Three windows, each with a page, written down; then a launch made by a
     # small window's link. Every window stays, off screen, and nothing is

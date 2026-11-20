@@ -2039,7 +2039,7 @@ final class Bench {
                 if let path = request["path"] as? String { sync.turnOn(URL(fileURLWithPath: path, isDirectory: true)) }
             default: break
             }
-            answer(["way": sync.way.rawValue, "available": SyncCloud.available, "problem": sync.problem ?? "",
+            answer(["way": sync.way.rawValue, "available": SyncCloud.available, "problem": sync.problem ?? "", "pushes": sync.pushes, "push": sync.pushRegistration,
                     "others": sync.others, "synced": sync.lastSynced.map { $0.timeIntervalSince1970 } ?? 0])
         case "filterlists":
             // The filter lists of Settings › Privacy (FilterLists.swift):

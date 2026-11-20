@@ -187,7 +187,14 @@ final class Sync: ObservableObject {
     }
 
     /// A silent push from the zone's subscription: another Mac wrote.
-    func heard() { schedule(after: 0.5) }
+    func heard() {
+        pushes += 1
+        schedule(after: 0.5)
+    }
+    /// How many pushes came, for the bench.
+    private(set) var pushes = 0
+    /// What registering for pushes came to, for the bench.
+    var pushRegistration = ""
 
     /// Settings › Sync Now.
     func syncNow() {

@@ -182,15 +182,26 @@ final class Links: NSObject, NSApplicationDelegate {
         Links.take(url)
     }
 
-    /// Files and anything else the system opens with the app: an address, or
-    /// a page on this Mac — an .html or .xhtml double-clicked in the Finder
-    /// once Search is the Mac's browser (it says it can open them, see
-    /// build.sh), which this used to drop without a word.
     /// A silent push from iCloud: another Mac changed what syncs.
     func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
         MainActor.assumeIsolated { Sync.shared.heard() }
     }
 
+    /// Whether this Mac can be pushed to (iCloud sync's zone subscription):
+    /// said on the bench, and nothing else hangs on it.
+    func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        MainActor.assumeIsolated { Sync.shared.pushRegistration = "registered" }
+    }
+
+    func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        let said = error.localizedDescription
+        MainActor.assumeIsolated { Sync.shared.pushRegistration = "failed: " + said }
+    }
+
+    /// Files and anything else the system opens with the app: an address, or
+    /// a page on this Mac — an .html or .xhtml double-clicked in the Finder
+    /// once Search is the Mac's browser (it says it can open them, see
+    /// build.sh), which this used to drop without a word.
     func application(_ application: NSApplication, open urls: [URL]) {
         guard !Store.testing else { return }
         for url in urls where url.isFileURL || Links.takes(url) {

@@ -83,6 +83,7 @@ macOS 14 or later, with Xcode 16 or a Swift 6 toolchain. No dependencies beyond 
 ```bash
 ./quo.sh            # build/Quo.app
 ./quo.sh install    # the same, then into /Applications (quits Quo first)
+./quo.sh release    # a signed, notarized release that every Quo updates to
 ```
 
 Everything the app says about itself reads `Store.name`, so it says Quo here and Search in a plain build. Code, comments and file names still say Search, so upstream merges stay clean; what Quo shows or leaves behind while it runs (keychain items, error messages, log subsystems, temporary folders) is named for Quo. The sync folder is "Quo Sync"; one made as "Search Sync" is moved to the new name the first time Quo syncs. "A fork of Search by Office Commun" in About, Search's own release notes and the copyright line keep the credit.
@@ -106,9 +107,29 @@ Settings › General › Sync can go through iCloud: each Mac's spaces, pins, bo
 1. **Identifiers › iCloud Containers**: `iCloud.com.edinabazi.quo`.
 2. **Identifiers › App IDs**: `com.edinabazi.quo`, with iCloud (CloudKit, that container) and Push Notifications.
 3. **Profiles › Developer ID**: for that App ID, saved here as `Quo.provisionprofile` (git-ignored). `quo.sh` then embeds it with `Quo.entitlements`.
-4. The first time only: `SEARCH_ICLOUD_ENV=Development ./quo.sh install`, turn sync to iCloud so the record type is made, then **Deploy Schema Changes** to Production in the CloudKit Console, and build normally.
+4. The first time only: make the record type in CloudKit's development environment, then **Deploy Schema Changes** to Production in the CloudKit Console. `Tests/sync_icloud_real.py` does the first half: it runs two hidden Quos, signed for development, against the real iCloud (see its header for the build).
+
+Steps 1 and 2 can be left to Xcode: building any app with this bundle ID and `Quo.entitlements` for this Mac (`xcodebuild … -destination 'platform=macOS' -allowProvisioningUpdates -allowProvisioningDeviceRegistration`) registers the Mac, makes the container and the App ID, and gives a development profile. The Developer ID profile in step 3 is made in the portal: Xcode makes Developer ID profiles only with a cloud-managed certificate, which needs the Account Holder.
 
 Without the profile, Quo builds as before and offers only the folder. `Tests/sync_icloud.py` plays two Macs against a folder standing in for iCloud.
+
+### Releases and updates
+
+Quo updates itself with Search's own updater, pointed at Quo's GitHub releases instead of Office Commun's site. Every Quo reads `https://github.com/edinabazi/Quo/releases/latest/download/appcast.json.zip`, a feed signed with the same Developer ID as the app. When it names a newer build, Quo fetches the ZIP, checks its hash and signature, and swaps it in for the next launch.
+
+```bash
+./quo.sh release 0.1.1   # build, notarize and publish Quo 0.1.1
+```
+
+That writes the version to `QUO_VERSION`, builds with the Developer ID and `Quo.provisionprofile`, notarizes the disk image and the ZIP, checks the signed feed, and makes the GitHub release `v0.1.1` (marked latest) with `Quo.dmg`, `Quo.zip` and the feed. What's new goes first in `QUO_NOTES.md`, one paragraph; it's the line under the version in Settings and the release's notes. It refuses to run with uncommitted or unpushed changes, or without the profile.
+
+It needs a notarytool profile called `quo`, made once with an app-specific password from account.apple.com:
+
+```bash
+xcrun notarytool store-credentials quo --apple-id <your Apple ID> --team-id 8B6VFDJHA2
+```
+
+`Tests/quo_update.py` checks the whole path against a local server: an older Quo finds a newer one, swaps it in, and refuses a feed signed under another identifier.
 
 ### Moving your Search data into Quo
 

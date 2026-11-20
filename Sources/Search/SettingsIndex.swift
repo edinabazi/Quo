@@ -647,7 +647,7 @@ enum SettingsIndex {
         case "launcher.key": return prefs.launcher
         case "shield.lists": return prefs.shielded
         // Only Search's own releases update themselves: a fork is built again.
-        case "updates.version", "updates.auto": return Updater.official
+        case "updates.version", "updates.auto": return Updater.updates
         default: return true
         }
     }
