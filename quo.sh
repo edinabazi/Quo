@@ -28,7 +28,7 @@ fi
 # Commun's. Each release is a GitHub release with Quo.zip, Quo.dmg and the
 # feed (appcast.json, and the copy signed with the Developer ID); "latest"
 # always points at the newest one, so the feed's address never changes.
-REPO="edinabazi/Quo"
+REPO="razegrowth/Quo"
 TEAM="8B6VFDJHA2"
 export SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_ICON=Icon/Quo.icon \
   SEARCH_FEEDBACK="https://github.com/$REPO/issues/new" \

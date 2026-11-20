@@ -1,6 +1,6 @@
 # What Quo does better than Search
 
-Everything Quo has added to or fixed in [Search](https://github.com/driceroland/Search) since forking it, kept up to date as Quo changes. Newest first within each section. Naming and branding (Quo's name, icon, `quo://`, its own data) aren't listed; see the README for those.
+Everything Quo has added to or fixed in [Search](https://github.com/driceroland/Search) since forking it, kept up to date as Quo changes. Newest first within each section. Naming and branding (Quo's name, icon, `quo://`, its own data) aren't listed.
 
 ## Looks and feel
 

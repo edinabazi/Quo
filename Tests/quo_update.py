@@ -44,7 +44,7 @@ FEED = f"http://127.0.0.1:{srv.server_port}"
 
 QUO = {
     "SEARCH_NAME": "Quo", "SEARCH_BUNDLE_ID": "com.edinabazi.quo", "SEARCH_ICON": "Icon/Quo.icon",
-    "SEARCH_FEED_URL": "https://github.com/edinabazi/Quo/releases/latest/download/appcast.json",
+    "SEARCH_FEED_URL": "https://github.com/razegrowth/Quo/releases/latest/download/appcast.json",
     "SEARCH_FEED_TEAM": TEAM, "SEARCH_NOTES": "QUO_NOTES.md",
 }
 
@@ -85,7 +85,7 @@ try:
     check = Path(tempfile.mkdtemp())
     subprocess.run(["ditto", "-x", "-k", str(served / "appcast.json.zip"), str(check)], check=True)
     t.ok("the feed is signed as Quo's, by Quo's team", verifies(check / "appcast.json", "com.edinabazi.quo.appcast"))
-    t.ok("the older Quo names its own feed", info(app).get("SearchFeed", "").startswith("https://github.com/edinabazi/Quo/"), info(app).get("SearchFeed"))
+    t.ok("the older Quo names its own feed", info(app).get("SearchFeed", "").startswith("https://github.com/razegrowth/Quo/"), info(app).get("SearchFeed"))
 
     sv.APP = str(app)
     sv.setup()

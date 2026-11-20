@@ -1,78 +1,96 @@
 # Quo
 
-A personal fork of [Search](https://github.com/driceroland/Search), the small, fast WebKit browser for the Mac by [Office Commun](https://officecommun.com).
+A fast, quiet browser for the Mac, with Arc's habits and none of Chromium's weight.
 
-Quo keeps everything Search is (tabs down the side or across the top, an ad blocker that runs before the page, passwords in your keychain, Chrome extensions on WebKit, about 10 MB on disk) and goes its own way on a few things Search decided against.
+**[Download the latest release →](https://github.com/razegrowth/Quo/releases/latest)** · macOS 14 or later (extensions need 15.4) · free · updates itself
 
-Short, and quick to type: Q-U-O rolls across the top row of the keyboard.
+Quo runs on **WebKit**, the engine already inside every Mac, so the app is small, opens instantly and goes easy on the battery: there's no second copy of Chromium to download, update and keep in memory. Tabs sit down the side, the page takes the rest, and nothing asks for your attention.
+
+Quo began as a fork of [Search](https://github.com/driceroland/Search) by [Office Commun](https://officecommun.com) and has grown into its own app. Every change made since is listed in [IMPROVEMENTS.md](IMPROVEMENTS.md).
 
 ---
 
-## What's different from Search
+## Tabs, spaces and pins
 
-The running list of everything Quo improves on Search is in [IMPROVEMENTS.md](IMPROVEMENTS.md); the main things are below.
+- **Tabs down the side**, Roomy or Compact, or across the top if you prefer. With the address bar above the page, the column lines up with the page's card. `⌘S` folds the column away.
+- **Spaces** keep separate sets of tabs, each in its own colour or gradient picked on a colour wheel, with film grain if you like. Switch with `⌃1`–`⌃9`, `⌥⌘←` and `⌥⌘→`, or a two-finger swipe.
+- **Profiles** give spaces their own sign-ins, history and bookmarks, all in one window. Links to sites you choose can always open in their space.
+- **Pins that keep their site.** A pin stays on its site: a link elsewhere opens in a new tab beside it, and `⌘W` takes the pin back home. Pins are squares or rows, and rows go in folders, as in Arc.
+- **Split View**: two pages side by side. `⌥`-click a tab, drag one onto a page, or press `⌥⌘N`.
+- **Tab groups**, a **side panel** for a website you keep beside the page, **Peek** (open a link in a panel over the page you're reading), and **downloads as cards** in the column.
+- **An empty tab is your space's home**: its name, the sites you visit most and the tabs you closed last.
+- **Tabs that cost nothing when idle.** Tabs from last time come back instantly and load when you click them. Tabs you leave alone sleep, and you can keep chosen sites awake.
 
-### An address bar above the page
+## Getting anywhere
 
-On for a new install, along with the tabs down the side and Roomy. Switch it in **Settings › Tabs › Address bar above the page**. It only applies with the tabs down the side. A Quo that ran before this keeps what it had.
+- **`⌘T` floats a field over the page**, as Arc's command bar does. Before you type it lists the tabs you were last in, a Switch to Tab away. As you type it offers matching open tabs, your bookmarks, the places you've been, a search, and every menu command and Settings page.
+- **An address bar above the page** shows the whole address, with back, forward, reload and your extensions.
+- **One field for everything.** Type an address and you go there; type words and you search. It finishes addresses from your own history. A word before your search sends it to a site (`red` and Tab searches Reddit), and you can pick which engine Shift-Return uses.
+- **`⌘K`** lists your open tabs by name. **`⌃Tab`** walks between recent tabs.
+- **Links from other apps** open in a small window to read and close, or keep with Open in Quo (`⌘O`). It springs open and flies into place in the browser when kept.
+- **The address field from any app**, on a key of your own, as Spotlight does.
+- **Right-click an address you've selected** to go to it.
 
-- **The whole address, always.** The site in ink, the path and query dimmed after it, as Chrome and Dia show it. "Not secure" and look-alike domains still show, exactly as in the tab.
-- **Back, forward and reload** move from the top of the column into the bar.
-- **Extensions move to the bar's far end**, out of the column's foot.
-- **The column shows page titles only.** The bar has the address, so the tab no longer swaps its title for it.
-- **Click the address, or press ⌘L,** to edit it right there, with the same suggestions and site card as editing in the tab. Right-click for Copy Address.
-- It folds away with the column (⌘S) and when a video takes the screen, as the bookmarks bar does.
+## Reading and watching
 
-### Roomy or Compact
+- **Reading mode** (`⌥⌘R`) strips a page down to the article, light or dark with the window.
+- **Hide anything for good.** Press `⇧⌘H`, then click a cookie banner, an overlay or a sidebar of clutter. It stays gone on that site, before the page draws a frame.
+- **Float the video** (`⇧⌘P`) in a window above everything, including other apps. A live stream fills it.
+- **Translate pages on this Mac.** Nothing is sent anywhere to translate them.
+- **Darken pages that stay light**, capture an area or a whole page, add your own CSS to a site, and scroll at 120 Hz.
 
-**Settings › Appearance › Size › Density**: Roomy, the default for a new install, or Compact, as Search is. Roomy gives the column taller tabs with larger titles, and the rest of the chrome follows: the address bar's field is as tall as a tab, its buttons are larger, the ⌘T / ⌘L field and its suggestions are a size up, and Settings itself has taller rows, larger words and more space between its sections. (It was Roomier tabs, under Tabs; a choice made there is kept.)
+## Privacy and blocking
 
-### Arc's habits, on from the start
+- **An ad blocker that runs before the page.** Trackers and ad networks are stopped inside WebKit's networking, so there's nothing to render and nothing to slow down. YouTube's ads too.
+- **Filter lists** such as EasyList, EasyPrivacy, Fanboy's Annoyances or your own are compiled into WebKit's rules and kept up to date.
+- **Cross-site tracking prevention**, click trackers stripped from links, and Global Privacy Control on every request.
+- **Private tabs** (`⇧⌘N`) have their own cookie jar and leave nothing behind.
+- **No telemetry, no analytics, no account.** The only things that leave your Mac are the pages you ask for, their icons, a check for updates, and sync if you turn it on.
 
-Search has most of what Arc taught people, but starts plain and leaves them off. A new install of Quo starts with them on, for anyone coming from Arc or Dia:
+## Passwords and sign-ins
 
-- **Spaces**, switched with ⌃1–9 or a two-finger swipe over the tabs.
-- **⌘T in a floating field** over the page, like Arc's command bar, with your **last three places** in it before you type, and **commands** ("settings", "new tab") typed into the address field.
-- **Pinned rows** under the pin squares, and **folders** in them.
+- **Passwords in your Mac's keychain**, shown with Touch ID. Quo offers to save a sign-in once it has worked, and offers your accounts under a sign-in box when you click it. It never fills anything on its own.
+- **Apple's Passwords app**: its accounts and verification codes can come up under their box too.
+- **Your contact card** fills name, email, phone and address boxes.
 
-Already on in Search too: pins that keep their site, Peek (shift-click a link), the small window for links from other apps, Tab to search a site, Split View and ⌃Tab. Closing tabs you leave alone stays off: Arc's 12 hours surprises anyone from Chrome, and it's one choice away in Settings › Tabs. A Quo that ran before keeps what it had; Settings › Spaces & Pins › Set Up Like Arc turns the main ones on in one go.
+## Extensions
 
-### Filter lists for the built-in blocker
+- **Chrome extensions, without Chrome.** Add them from the Chrome Web Store or load your own folder. They run on WebKit's extension engine, and Quo fills in the Chrome APIs WebKit lacks: bookmarks, history, downloads, side panel, notifications, OAuth sign-in and more.
+- **Agent extensions can work the page.** Claude, ChatGPT's agent and anything else that uses Chrome's `debugger` can click, type, scroll and take screenshots in a tab.
+- **Each extension runs where you say**: on every site, on sites you name, or only when you click its button. One that's slowing pages down is offered On click, and tools like SEO and font inspectors start that way.
 
-Search's blocker is a short hand-written list. Quo's can also take the lists every other blocker uses: **Settings › Privacy › Filter lists › Add…**, then an address or a file. Good ones to start with:
+## Your things, on every Mac
 
-- `https://easylist.to/easylist/easylist.txt` (ads)
-- `https://easylist.to/easylist/easyprivacy.txt` (trackers)
+- **Sync through iCloud**: spaces, pins, bookmarks and settings, in your own private iCloud, with no server or account of ours. Or sync through a folder you choose.
+- **Bring things over** from Chrome, Arc, Dia, Brave, Edge, Vivaldi, Firefox or Zen: every profile, with its bookmarks, history, passwords and extensions. Arc's spaces, pins and folders come too.
+- **An onboarding** sets it up your way: the look, where the tabs go, a colour, what to bring over, and the default browser.
 
-Each list is turned into WebKit's own rules and compiled once, a few seconds for a big one, then loads instantly at launch. It updates as often as the list asks. The site card's switch turns them off for one site along with the rest of the blocker. What WebKit's rules can't express (scriptlets, redirects, `:has-text()` and the like) is skipped and counted on the list's row. So a page that fights ad blockers can still get its way where uBlock Origin Lite's scriptlets would stop it.
+## For coding agents
 
-This is [driceroland/Search#738](https://github.com/driceroland/Search/pull/738) by [@oddharsh](https://github.com/oddharsh), which Search closed to stay small.
+Claude Code or Codex can browse in tabs of their own while you watch (Settings › About › Developer). Quo asks each time one connects and shows a Stop button while it's there.
 
-### Pins keep their site
+---
 
-A link in a pinned tab that leads to another site, or another site's address typed into it (in its row, the address bar or ⌘L), opens in a new tab beside it, and the pin stays where it was, as in Dia. Search opens such links in a Peek over the pin instead; that is still a choice in **Settings › Spaces & Pins › Links to other sites open in**. A page of the pin's own site still loads in the pin.
+## Keyboard
 
-### Chrome's reload keys
+| | |
+|---|---|
+| `⌘L` address · `⌘T` new tab · `⌘K` switch tab · `⌘W` close · `⇧⌘T` reopen | `⌘[` `⌘]` back, forward · `⌘1`–`⌘9` jump to a tab |
+| `⌃1`–`⌃9` spaces · `⌥⌘←` `⌥⌘→` previous, next space | `⌘S` fold the column · `⌥⌘N` split the page |
+| `⌘R` reload · `⇧⌘R` reload from the server · `⌥⌘R` reading mode | `⇧⌘P` float the video · `⇧⌘H` hide something · `⇧⌘B` bookmark |
+| `⌘F` find · `⇧⌘C` copy address · `⇧⌘V` paste and go | `⌘Y` history · `⇧⌘J` downloads · `⌘,` settings · `⌥⌘L` passwords |
 
-**⇧⌘R** reloads the page from the server, skipping the cache, as in Chrome. Reading Mode moves to **⌥⌘R**. Search has them the other way round, as Safari does. Both can be changed in Settings › Keyboard & Mouse.
+Every shortcut can be changed in Settings › Keyboard & Mouse.
 
-### Its own app
+## Privacy, concretely
 
-Quo runs beside an installed Search without sharing anything with it:
-
-| | Search | Quo |
+| What | Where it is | Who can read it |
 |---|---|---|
-| Name in the app | Search | Quo: menus, Settings, alerts, permission prompts, the AppleScript dictionary, its own pages' addresses (`quo://settings`; an old `search://` one still opens) |
-| Bundle ID | `com.officecommun.search` | `com.edinabazi.quo` |
-| Tabs, history, pins, extensions | `~/Library/Application Support/Search` | `~/Library/Application Support/Quo` |
-| Settings | `com.officecommun.search` | `com.edinabazi.quo` |
-| Cookies and site data | WebKit's container for Search | WebKit's container for Quo |
-| Keychain items | Search's | Quo's own |
-| Updates | Office Commun's feed, signed | None: rebuild it yourself |
-
-They share nothing, the keychain included: Quo keeps its passwords, AI keys and proxy password under its own name, apart from Search's.
-
-Passkeys through the browser's own sheet need an entitlement Apple grants only to Search's signed releases, so they don't work in Quo. Passkeys in a password-manager extension still do.
+| Passwords | Your login keychain, as items tagged `Quo` | Quo. Any other app gets the system's permission dialog. |
+| History, bookmarks, tabs, hidden elements | `~/Library/Application Support/Quo/` | You. |
+| Synced spaces, pins, bookmarks, settings | Your private iCloud database, in CloudKit's encrypted fields, if you turn sync on | You, on your Macs. |
+| Cookies and site data | WebKit's own store for Quo | The sites that set them, as in any browser. |
+| Extensions | `~/Library/Application Support/Quo/Extensions/` and WebKit's extension store | Each extension, within the permissions you gave it. |
 
 ---
 
@@ -83,73 +101,41 @@ macOS 14 or later, with Xcode 16 or a Swift 6 toolchain. No dependencies beyond 
 ```bash
 ./quo.sh            # build/Quo.app
 ./quo.sh install    # the same, then into /Applications (quits Quo first)
-./quo.sh release    # a signed, notarized release that every Quo updates to
 ```
 
-Everything the app says about itself reads `Store.name`, so it says Quo here and Search in a plain build. Code, comments and file names still say Search, so upstream merges stay clean; what Quo shows or leaves behind while it runs (keychain items, error messages, log subsystems, temporary folders) is named for Quo. The sync folder is "Quo Sync"; one made as "Search Sync" is moved to the new name the first time Quo syncs. "A fork of Search by Office Commun" in About, Search's own release notes and the copyright line keep the credit.
+It signs with the first Developer ID certificate in your keychain, or ad hoc if there's none (then the first launch needs right-click › Open).
 
-`quo.sh` is `build.sh` with a name, a bundle ID and an icon mark of its own (`SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_MARK=Icon/quo-mark.svg`). The app's data folder, settings and WebKit container all follow the bundle ID; the code still says "Search" by default, so upstream changes merge cleanly.
+The code, file names and module still say Search, so changes from upstream merge cleanly. The app takes its name at runtime: `quo.sh` is `build.sh` with Quo's name, bundle ID (`com.edinabazi.quo`), icon and update feed. `./build.sh` on its own makes a plain `build/Search.app`.
 
-It signs with the first Developer ID certificate in your keychain, or ad hoc if there is none (then the first launch needs right-click › Open).
-
-For quick checks while working, `swift build` compiles, `swift test --parallel` runs the unit tests in about a minute (one after another, `swift test` takes over twelve), and `SEARCH_DEV=1 ./build.sh` makes a yellow-icon dev build of Search. To try a dev build without touching anyone's data, open it in a test profile of its own:
+For quick checks, `swift build` compiles and `swift test --parallel` runs the unit tests. The `Tests/*.py` scripts drive a hidden copy of the app through its test socket, in a profile of its own that's wiped afterwards; the browser you use is never touched. To try a build without touching your data:
 
 ```bash
 open -n --env SEARCH_PROBE=mytest build/Search.app
 ```
 
-Test profiles turn a few things off on purpose (links from other apps, mailto:, file pickers), so they're for checking, not for daily use.
-
-### Sync through iCloud
-
-Settings › General › Sync can go through iCloud: each Mac's spaces, pins, bookmarks and settings are a record in the person's own private iCloud, in CloudKit's encrypted fields, with no account or server of ours (`SyncCloud.swift`). It needs a build signed for an iCloud container, set up once in the Apple Developer account:
-
-1. **Identifiers › iCloud Containers**: `iCloud.com.edinabazi.quo`.
-2. **Identifiers › App IDs**: `com.edinabazi.quo`, with iCloud (CloudKit, that container) and Push Notifications.
-3. **Profiles › Developer ID**: for that App ID, saved here as `Quo.provisionprofile` (git-ignored). `quo.sh` then embeds it with `Quo.entitlements`.
-4. The first time only: make the record type in CloudKit's development environment, then **Deploy Schema Changes** to Production in the CloudKit Console. `Tests/sync_icloud_real.py` does the first half: it runs two hidden Quos, signed for development, against the real iCloud (see its header for the build).
-
-Steps 1 and 2 can be left to Xcode: building any app with this bundle ID and `Quo.entitlements` for this Mac (`xcodebuild … -destination 'platform=macOS' -allowProvisioningUpdates -allowProvisioningDeviceRegistration`) registers the Mac, makes the container and the App ID, and gives a development profile. The Developer ID profile in step 3 is made in the portal: Xcode makes Developer ID profiles only with a cloud-managed certificate, which needs the Account Holder.
-
-Without the profile, Quo builds as before and offers only the folder. `Tests/sync_icloud.py` plays two Macs against a folder standing in for iCloud.
-
 ### Releases and updates
 
-Quo updates itself with Search's own updater, pointed at Quo's GitHub releases instead of Office Commun's site. Every Quo reads `https://github.com/edinabazi/Quo/releases/latest/download/appcast.json.zip`, a feed signed with the same Developer ID as the app. When it names a newer build, Quo fetches the ZIP, checks its hash and signature, and swaps it in for the next launch.
+Every Quo checks `https://github.com/razegrowth/Quo/releases/latest/download/appcast.json.zip`, a feed signed with the app's Developer ID. When it names a newer build, Quo fetches the ZIP, checks its hash and signature, and swaps it in for the next launch.
+
+To release, set `QUO_VERSION`, add a `## <version> · <date>` section to `QUO_NOTES.md` (its first paragraph is the line under the version in Settings), commit and push, then:
 
 ```bash
-./quo.sh release 0.1.1   # build, notarize and publish Quo 0.1.1
+./quo.sh release 0.2.1
 ```
 
-First set `QUO_VERSION` to the new version and add its section to `QUO_NOTES.md` (`## 0.1.1 · date`, then what's new), commit and push. The release builds with the Developer ID and `Quo.provisionprofile`, notarizes the disk image and the ZIP, checks the signed feed, and makes the GitHub release `v0.1.1` (marked latest) with `Quo.dmg`, `Quo.zip` and the feed, its notes the version's section. The newest section's first paragraph is the line under the version in Settings, and every section is in Settings › About › What's New, above Search's. It refuses to run with uncommitted or unpushed changes, a version that isn't `QUO_VERSION`, notes without that version, or without the profile.
-
-It needs a notarytool profile called `quo`, made once with an app-specific password from account.apple.com:
+That builds with the Developer ID and `Quo.provisionprofile` (git-ignored), notarizes the disk image and the ZIP, checks the signed feed, and publishes the GitHub release with `Quo.dmg`, `Quo.zip` and the feed. It refuses to run with uncommitted or unpushed changes, or notes that don't name the version. It needs a notarytool profile called `quo`, made once:
 
 ```bash
 xcrun notarytool store-credentials quo --apple-id <your Apple ID> --team-id 8B6VFDJHA2
 ```
 
-`Tests/quo_update.py` checks the whole path against a local server: an older Quo finds a newer one, swaps it in, and refuses a feed signed under another identifier.
+`Tests/quo_update.py` checks the whole update path against a local server.
 
-### Moving your Search data into Quo
+### iCloud sync
 
-Quo starts empty. To bring over everything from an installed Search (settings, tabs, pins, history, bookmarks, extensions, cookies), quit Quo and copy it across once:
+Sync through iCloud needs a build signed for the `iCloud.com.edinabazi.quo` container. The App ID `com.edinabazi.quo` needs iCloud (CloudKit) and Push Notifications, and its Developer ID profile is saved here as `Quo.provisionprofile`. The record type is made once in CloudKit's development environment and deployed to Production in the CloudKit Console. Without the profile, Quo builds as before and offers only folder sync. `Tests/sync_icloud.py` plays two Macs against a folder, and `Tests/sync_icloud_real.py` against the real iCloud.
 
-```bash
-L=~/Library; S=com.officecommun.search; Q=com.edinabazi.quo
-cp -Rp "$L/Application Support/Search" "$L/Application Support/Quo"
-defaults export $S - | defaults import $Q -
-mkdir -p "$L/WebKit/$Q"
-cp -Rp "$L/WebKit/$S/WebsiteData" "$L/WebKit/$S/WebExtensions" "$L/WebKit/$Q/"
-cp -Rp "$L/HTTPStorages/$S" "$L/HTTPStorages/$Q"
-cp -p "$L/HTTPStorages/$S.binarycookies" "$L/HTTPStorages/$Q.binarycookies"
-```
-
-Some sites, Google among them, may ask you to sign in again in Quo.
-
----
-
-## Keeping up with Search
+### Keeping up with Search
 
 `origin` is this repository; `upstream` is Search.
 
@@ -159,8 +145,8 @@ git merge upstream/main
 ./quo.sh install
 ```
 
-How Search is put together (one file per concern in `Sources/Search/`, the `./bench` test socket, the extension shims) is in [Search's README](https://github.com/driceroland/Search#for-developers), and still applies here.
+How the code is laid out (one file per concern in `Sources/Search/`, the `./bench` test socket, the extension shims) is in [Search's README](https://github.com/driceroland/Search#for-developers), and still applies.
 
 ## License
 
-MIT, as Search is: see [LICENSE](LICENSE). The code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun. Quo has its own icon, a dark Q on a white tile, made in Icon Composer (`Icon/Quo.icon`; the build turns it into the Dock's styles and the flat `.icns` with Icon Composer's `ictool`, and falls back to the older drawn mark, `Icon/quo-mark.svg`, on a Mac without it). Settings › About and the welcome screen show it too. `Sources/Search/FilterList.swift` is a port of [adblock-rust](https://github.com/brave/adblock-rust) and stays under its licence, the Mozilla Public License 2.0.
+MIT, as Search is: see [LICENSE](LICENSE). The original code is Office Commun's and its contributors', with Quo's changes on top. "Search" and its icon belong to Office Commun; Quo has its own icon (`Icon/Quo.icon`). `Sources/Search/FilterList.swift` is a port of [adblock-rust](https://github.com/brave/adblock-rust) and stays under its licence, the Mozilla Public License 2.0.
