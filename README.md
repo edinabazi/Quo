@@ -10,6 +10,8 @@ Short, and quick to type: Q-U-O rolls across the top row of the keyboard.
 
 ## What's different from Search
 
+The running list of everything Quo improves on Search is in [IMPROVEMENTS.md](IMPROVEMENTS.md); the main things are below.
+
 ### An address bar above the page
 
 On for a new install, along with the tabs down the side and Roomy. Switch it in **Settings › Tabs › Address bar above the page**. It only applies with the tabs down the side. A Quo that ran before this keeps what it had.

@@ -1,0 +1,35 @@
+# What Quo does better than Search
+
+Everything Quo has added to or fixed in [Search](https://github.com/driceroland/Search) since forking it, kept up to date as Quo changes. Newest first within each section. Naming and branding (Quo's name, icon, `quo://`, its own data) aren't listed; see the README for those.
+
+## Looks and feel
+
+- **Roomy or Compact** (Settings › Appearance › Size), Roomy by default. Taller tabs and rows and larger text in the column, a larger address bar and ⌘T field, and more room in Settings, every built-in page (History, Downloads, Bookmarks, Passwords, Archived Tabs), the small window for links and website pop-ups. Pin squares are taller, as Arc's are. *Nov 2026*
+- **The window's buttons stay on the left with the column on the right**, in a row across the top: the address bar, or with it off, a slim row with back, forward and reload. Search moved them into the column's far corner. *Nov 2026*
+- **The address field takes a space's colour** instead of sitting on it as a grey slab. *Nov 2026*
+- **Smooth scrolling with a mouse wheel**, as in Chrome: each notch eased out instead of jumping (Settings › Keyboard & Mouse). *Nov 2026*
+- **A tab's whole title on hover** when the row cuts it short, in Quo's own tooltip: quicker, larger, and in the app's own style. *Nov 2026*
+- **An address bar above the page**, on by default: the whole address, back, forward and reload, and the extensions' buttons at its far end. *Nov 2026*
+
+## Habits from Arc and Chrome
+
+- **Downloads as cards in the column**, as in Arc: progress and time left while they come in, then the file itself, to open, show in Finder or drag out to another app. Search had a small ring in the column's foot. *Nov 2026*
+- **Arc's habits on from the start**: spaces, ⌘T's floating field with recent places and commands, pinned rows and folders in them. Search has them all but starts with them off. *Nov 2026*
+- **A pin keeps its site when you type another one into it**: it opens in a new tab, as in Arc and Dia. *Nov 2026*
+- **Chrome's reload keys**: ⇧⌘R reloads skipping the cache, and Reading Mode moves to ⌥⌘R. *Nov 2026*
+
+## Blocking
+
+- **Popular filter lists a click away** (EasyList, EasyPrivacy, Fanboy's Annoyances, the cookie notice list). *Nov 2026*
+- **Filter lists for the built-in blocker**: the lists every other blocker uses, by address or file, compiled into WebKit's own rules. Search closed this ([driceroland/Search#738](https://github.com/driceroland/Search/pull/738)). *Oct 2026*
+
+## Extensions
+
+- **Lighter on every page**: the part of Quo's extension helper that content scripts carry is about 120 KB, not 275 KB, in every frame. 1Password's buttons and menus feel smoother. *Nov 2026*
+- **Popups open at their settled size** instead of opening small and jumping (Ahrefs, Cookie-Editor), or growing and morphing as they open. *Nov 2026*
+- **Notifications work as in Chrome**: an extension's buttons under the notification's Options, and clicks, buttons and dismissals going back to the extension. *Nov 2026*
+- **⌘-drag the pinned extension buttons to reorder them**, as the Mac's menu bar does. *Nov 2026*
+
+## Video
+
+- **A floating live stream fills its window**: YouTube's live player sat a quarter size in the window's corner. *Nov 2026*
