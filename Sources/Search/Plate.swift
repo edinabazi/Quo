@@ -30,6 +30,7 @@ struct Plate<Content: View, Foot: View>: View {
     }
 
     @Environment(\.asTab) private var asTab
+    @Environment(\.roomySettings) private var roomy
 
     var body: some View {
         if asTab { page } else { card }
@@ -41,10 +42,10 @@ struct Plate<Content: View, Foot: View>: View {
     private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: roomy ? 25 : 22, weight: .semibold))
                 .foregroundStyle(Palette.ink)
-                .padding(.top, 44)
-                .padding(.bottom, 20)
+                .padding(.top, roomy ? 52 : 44)
+                .padding(.bottom, roomy ? 26 : 20)
 
             content()
 
@@ -57,7 +58,8 @@ struct Plate<Content: View, Foot: View>: View {
             Color.clear.frame(height: 12)
         }
         .padding(.horizontal, 22)
-        .frame(maxWidth: width, maxHeight: .infinity, alignment: .topLeading)
+        // Roomy: a little wider, for the larger words.
+        .frame(maxWidth: roomy ? width + 60 : width, maxHeight: .infinity, alignment: .topLeading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
@@ -202,6 +204,7 @@ struct Hunt: View {
     @Binding var text: String
     var prompt = "Search"
     var focus: FocusState<Bool>.Binding
+    @Environment(\.roomySettings) private var roomy
 
     var body: some View {
         HStack(spacing: 8) {
@@ -217,7 +220,7 @@ struct Hunt: View {
                     .foregroundStyle(Palette.ink)
                     .focused(focus)
             }
-            .font(.system(size: 13))
+            .font(.system(size: roomy ? 14 : 13))
             if !text.isEmpty {
                 Button { text = "" } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -228,7 +231,7 @@ struct Hunt: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, roomy ? 10 : 8)
         .background(Palette.wash, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

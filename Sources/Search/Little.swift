@@ -426,7 +426,7 @@ struct LittleView: View {
                     Pill("Open in \(Store.name)", large: roomy, action: keep)
                         .help("Open in \(Store.name)   ⌘O")
                 } else {
-                    Spacer().frame(width: 64)
+                    Spacer().frame(width: roomy ? 70 : 64)
                 }
             }
             .padding(.horizontal, roomy ? 12 : 10)
@@ -517,13 +517,17 @@ private struct LittleToast: View {
 /// it. Its tabs, checks and passwords are the browser's, as in any window.
 struct PopupWindowView: View {
     @ObservedObject var browser: Browser
+    /// Appearance › Size was Roomy when it opened: the taller bar, as the
+    /// small window for a link has (the window's buttons are placed to match,
+    /// see Browsers.open).
+    var roomy = false
 
     var body: some View {
         if let tab = browser.active {
-            LittleView(tab: tab, keep: nil).id(tab.id)
+            LittleView(tab: tab, roomy: roomy, keep: nil).id(tab.id)
                 .overlay(alignment: .topLeading) {
                     if let asked = browser.suggesting, asked.tab == tab.id {
-                        AccountList(browser: browser, asked: asked).offset(y: 34)
+                        AccountList(browser: browser, asked: asked).offset(y: roomy ? LittleView.roomyBar : 34)
                     }
                 }
                 .overlay(alignment: .bottom) {

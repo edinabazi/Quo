@@ -138,12 +138,17 @@ enum SidebarDefault {
         }
     }
 
-    /// Settings on for a fresh install of Quo: Roomier tabs and the address
-    /// bar above the page. The same one time as the sidebar above, with a
-    /// line of its own for each, since installs that had settled that one
-    /// before this build must still be asked: one that ran before, with no
-    /// line for a setting, had it off, and keeps it off.
-    static let onWhenFresh = ["sidebar.roomy", "sidebar.addressBar"]
+    /// Settings on for a fresh install of Quo: Roomy and the address bar
+    /// above the page, and Arc's habits, for someone coming from Arc or Dia:
+    /// spaces, ⌘T's field over the page with the recent places in it and the
+    /// address field's commands, and pins as rows, in folders. (Closing tabs
+    /// left alone stays off: tabs gone overnight surprise anyone from
+    /// Chrome.) The same one time as the sidebar above, with a line of its
+    /// own for each, since installs that had settled that one before this
+    /// build must still be asked: one that ran before, with no line for a
+    /// setting, had it off, and keeps it off.
+    static let onWhenFresh = ["sidebar.roomy", "sidebar.addressBar",
+                              "spaces", "newtab.floating", "newtab.recent", "commandbar", "pins.list", "pins.folders"]
 
     static func settleFresh(_ key: String, _ store: UserDefaults, testing: Bool, ranBefore: Bool) {
         let settled = key + ".settled"
@@ -215,7 +220,7 @@ final class Preferences: ObservableObject {
             if agents != oldValue { AgentTrust.shared.forgetAll() }
         }
     }
-    static let agentsMark = SwitchMark(service: "com.officecommun.search.agents")
+    static let agentsMark = SwitchMark(service: "\(Store.home).agents")
     /// Found on at launch without the mark, and put back to off.
     private(set) var agentsRefused = false
     /// Light, dark, or the Mac's own.
@@ -1147,11 +1152,11 @@ final class Preferences: ObservableObject {
         // Anyone who already has a session was here before the welcome
         // existed; they are not asked to sit through it.
         welcomed = store.bool(forKey: "welcomed") || store.object(forKey: "glyph") != nil
-        usesSpaces = store.bool(forKey: "spaces")
+        usesSpaces = SidebarDefault.onWhenFresh("spaces", store, testing: Store.testing)
         spacesOnCommand = store.bool(forKey: Preferences.spacesOnCommandKey)
         profilesInOneWindow = store.bool(forKey: "profiles.oneWindow")
-        listsPins = store.bool(forKey: "pins.list")
-        pinFolders = store.bool(forKey: "pins.folders")
+        listsPins = SidebarDefault.onWhenFresh("pins.list", store, testing: Store.testing)
+        pinFolders = SidebarDefault.onWhenFresh("pins.folders", store, testing: Store.testing)
         pinCommandOpensTab = store.bool(forKey: "pins.commandNewTab")
         // "Pins keep their site" is one switch over two keys (see
         // SettingsIndex): on when either was on, on by default when neither
@@ -1164,12 +1169,12 @@ final class Preferences: ObservableObject {
         ai = AI.shipped && store.bool(forKey: "ai")
         aiProvider = store.string(forKey: "ai.provider").flatMap(AIProvider.init(rawValue:))
         aiModels = store.dictionary(forKey: "ai.models") as? [String: String] ?? [:]
-        commandBar = store.bool(forKey: "commandbar")
-        floatingNewTab = store.bool(forKey: "newtab.floating")
+        commandBar = SidebarDefault.onWhenFresh("commandbar", store, testing: Store.testing)
+        floatingNewTab = SidebarDefault.onWhenFresh("newtab.floating", store, testing: Store.testing)
         launcher = store.bool(forKey: "launcher.on")
         launcherLittle = store.bool(forKey: "launcher.little")
         launcherKey = store.data(forKey: "launcher.key").flatMap { try? JSONDecoder().decode(LauncherKey.self, from: $0) }
-        recentInNewTab = store.bool(forKey: "newtab.recent")
+        recentInNewTab = SidebarDefault.onWhenFresh("newtab.recent", store, testing: Store.testing)
         // On for everyone who never touched it (24 Oct 2026).
         let history = store.object(forKey: "swipe.history") as? Bool ?? true
         holdsHistory = history

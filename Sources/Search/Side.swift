@@ -19,6 +19,8 @@ struct SideBar: View {
     @ObservedObject var browser: Browser
     @ObservedObject var prefs: Preferences
     @ObservedObject private var agents = AgentControl.shared
+    /// Downloads, for their cards over the foot (DownloadShelf).
+    @ObservedObject private var fetches = Shared.fetches
     /// On the window's ground, beside the page's card (see CardEdge): the
     /// ground's colour and no edge of its own, the card's edge being the line.
     var onFrame = false
@@ -128,7 +130,7 @@ struct SideBar: View {
                     DragStrip(menu: columnMenu)
                         .frame(width: 10 + lights)
                     // The doors' place, unless the address bar has them.
-                    if !browser.addressBarUp {
+                    if !browser.doorsInRow {
                         Color.clear
                             .frame(width: Metrics.helm)
                             .allowsHitTesting(false)
@@ -148,7 +150,7 @@ struct SideBar: View {
                     // the three doors one above the other under them.
                     Color.clear.frame(height: lightsBand)
                     // With the address bar up, the three doors are in it.
-                    if !browser.addressBarUp {
+                    if !browser.doorsInRow {
                         Helm(browser: browser, vertical: true)
                             .frame(maxWidth: .infinity)
                             .padding(.bottom, 8)
@@ -156,7 +158,7 @@ struct SideBar: View {
                 } else {
                     HStack(spacing: 0) {
                         Color.clear.frame(width: lights)
-                        if !browser.addressBarUp { Helm(browser: browser) }
+                        if !browser.doorsInRow { Helm(browser: browser) }
                         Spacer(minLength: 0)
                     }
                     .frame(height: band)
@@ -173,7 +175,9 @@ struct SideBar: View {
             // Clear of the foot, which sits over the sidebar's bottom edge,
             // and of what plays in another tab, over the foot.
             .padding(.bottom, footHeight + (browser.player == nil ? 0 : rowHeight + SideBar.playerGap)
-                     + (agentHere && !icons ? SideBar.agentRow + SideBar.playerGap : 0))
+                     + (agentHere && !icons ? SideBar.agentRow + SideBar.playerGap : 0)
+                     + (icons ? 0 : DownloadShelf.height(browser, fetches)))
+            .animation(Motion.settle, value: icons ? 0 : DownloadShelf.height(browser, fetches))
 
             VStack(spacing: 0) {
                 Spacer()
@@ -191,6 +195,11 @@ struct SideBar: View {
                         .padding(.horizontal, 10)
                         .padding(.bottom, SideBar.playerGap)
                         .transition(.opacity)
+                }
+                // Downloads coming in, and just in, as cards over the foot.
+                if !icons {
+                    DownloadShelf(browser: browser, fetches: fetches, prefs: prefs)
+                        .padding(.horizontal, 10)
                 }
                 foot
             }
@@ -682,7 +691,9 @@ struct SideBar: View {
         // A row of fewer than three keeps three places.
         let slots = rows.map { rows.count == 1 ? max($0, min(3, fits)) : $0 }
         let widths = slots.map { max(20, (room - CGFloat($0 - 1) * gap) / CGFloat($0)) }
-        let height = min(SideBar.square, widths.min() ?? SideBar.square)
+        // Roomy: taller squares, as Arc's are; their width is the row's.
+        let tall = prefs.roomyTabs ? 44 : SideBar.square
+        let height = min(tall, widths.min() ?? tall)
         var cells: [CGRect] = []
         for (row, n) in rows.enumerated() {
             for col in 0..<n {
@@ -1265,8 +1276,10 @@ private struct SideFoot: View {
                     ExtensionSlot(browser: browser, edge: .trailing, room: room)
                 }
                 BookmarkDoor(browser: browser, arrowEdge: .trailing)
-                // Only while a download is running, and a moment after.
-                FetchDoor(browser: browser, fetches: fetches, arrowEdge: prefs.sidePosition == .right ? .leading : .trailing)
+                // Only while a download is running, and a moment after; the
+                // cards over the foot show how it is going.
+                FetchDoor(browser: browser, fetches: fetches, arrowEdge: prefs.sidePosition == .right ? .leading : .trailing,
+                          quiet: true)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)

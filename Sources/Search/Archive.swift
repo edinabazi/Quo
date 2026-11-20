@@ -264,6 +264,7 @@ struct ArchivePanel: View {
 
     /// A title, its site, and when it closed: History's row.
     private struct Row: View {
+        @Environment(\.roomySettings) private var roomy
         let tab: Archived
         let go: () -> Void
         let remove: () -> Void
@@ -276,11 +277,11 @@ struct ArchivePanel: View {
                      letter: tab.site.first.map { String($0).uppercased() } ?? "•", size: 16)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tab.label)
-                        .font(.system(size: 13))
+                        .font(.system(size: roomy ? 14 : 13))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     Text(tab.site)
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -290,13 +291,13 @@ struct ArchivePanel: View {
                     Quick("Remove", tint: .red.opacity(0.75), act: remove)
                 } else {
                     Text(When.clock(tab.closed))
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .monospacedDigit()
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, roomy ? 12 : 9)
             .background(hovering ? Palette.hover : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: go)

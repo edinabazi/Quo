@@ -100,7 +100,7 @@ enum Browsers {
 
     /// SwiftUI's window's id, which is also the name its frame is kept
     /// under (#204); a test run's own.
-    static let sceneID = Store.world.map { "search (\($0))" } ?? "search"
+    static let sceneID = Store.world.map { "\(Store.name.lowercased()) (\($0))" } ?? Store.name.lowercased()
 
     static var primary: Browser? { all.first }
     static var front: Browser? { Front.shared.browser ?? all.last }
@@ -193,9 +193,11 @@ enum Browsers {
     /// A window around `browser`, made here rather than by SwiftUI.
     static func open(_ browser: Browser, frame: NSRect?) {
         let popup = browser.isPopup
+        // A pop-up follows Roomy as the small window for a link does.
+        let roomy = popup && Shared.prefs.roomyTabs
         let host: NSView
         if popup {
-            let view = NSHostingView(rootView: PopupWindowView(browser: browser).frame(minWidth: 200, minHeight: 150))
+            let view = NSHostingView(rootView: PopupWindowView(browser: browser, roomy: roomy).frame(minWidth: 200, minHeight: 150))
             view.sizingOptions = [.minSize]
             host = view
         } else {
@@ -225,6 +227,10 @@ enum Browsers {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.minSize = NSSize(width: 200, height: 150)
+            // Its buttons centred in the taller bar.
+            if roomy {
+                Lights.keep(window, centreX: { _ in LittleView.roomyBar / 2 }, height: { _ in LittleView.roomyBar }) {}
+            }
         }
         if let frame {
             window.setFrame(frame, display: false)

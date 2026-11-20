@@ -36,15 +36,22 @@ struct AddressBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Helm(browser: browser, side: AddressBar.door(browser.prefs))
-            if let tab = browser.active {
-                Field(browser: browser, tab: tab)
+            // The bar turned off, with the column on the right: the row
+            // only holds the window's buttons and the three doors, and the
+            // window is dragged by the rest of it.
+            if browser.bareRow {
+                DragStrip()
             } else {
-                Spacer(minLength: 0)
+                if let tab = browser.active {
+                    Field(browser: browser, tab: tab)
+                } else {
+                    Spacer(minLength: 0)
+                }
+                // A coding agent allowed in this window: its pill and Stop, at
+                // the far end as across the top (AgentBanner).
+                AgentStatus(browser: browser, style: .door)
+                ExtensionSlot(browser: browser, edge: .bottom, side: AddressBar.door(browser.prefs))
             }
-            // A coding agent allowed in this window: its pill and Stop, at
-            // the far end as across the top (AgentBanner).
-            AgentStatus(browser: browser, style: .door)
-            ExtensionSlot(browser: browser, edge: .bottom, side: AddressBar.door(browser.prefs))
         }
         // The window's buttons at its start, with the column on the right.
         .padding(.leading, browser.lightsInAddressBar && !browser.fullScreen ? Metrics.sideLights : 8)

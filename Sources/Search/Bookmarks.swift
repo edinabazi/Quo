@@ -984,6 +984,7 @@ struct BookmarkOutline: View {
     }
 
     private struct Row: View {
+        @Environment(\.roomySettings) private var roomy
         let node: Bookmark
         let depth: Int
         let arrows: Bool
@@ -1008,14 +1009,14 @@ struct BookmarkOutline: View {
             HStack(spacing: 8) {
                 if node.isFolder {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: roomy ? 10 : 9, weight: .semibold))
                         .foregroundStyle(Palette.faint)
                         .rotationEffect(.degrees(isOpen ? 90 : 0))
                         .frame(width: 10)
                     Mark(icon: nil, letter: "", size: 15)
                         .overlay(
                             Image(systemName: "folder.fill")
-                                .font(.system(size: 9))
+                                .font(.system(size: roomy ? 10 : 9))
                                 .foregroundStyle(Palette.muted)
                         )
                 } else {
@@ -1024,19 +1025,19 @@ struct BookmarkOutline: View {
                 }
                 // One without a name reads as its address, a shade lighter.
                 Text(node.label)
-                    .font(.system(size: 12.5))
+                    .font(.system(size: roomy ? 13.5 : 12.5))
                     .foregroundStyle(node.unnamed ? Palette.muted : Palette.ink)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 if node.isFolder, let kids = node.children, !kids.isEmpty {
                     Text("\(Bookmarks.count(kids))")
-                        .font(.system(size: 11))
+                        .font(.system(size: roomy ? 12 : 11))
                         .foregroundStyle(Palette.faint)
                 }
             }
             .padding(.leading, CGFloat(depth) * 18 + 10)
             .padding(.trailing, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, roomy ? 9 : 6)
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(wash))
             .overlay(alignment: aim == .before ? .top : .bottom) {
                 if aim == .before || aim == .after {

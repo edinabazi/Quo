@@ -85,6 +85,7 @@ struct PasswordsPanel: View {
 
     /// A site, and under it its accounts once opened.
     private struct Site: View {
+        @Environment(\.roomySettings) private var roomy
         let host: String
         let logins: [Kept]
         let open: Bool
@@ -99,28 +100,28 @@ struct PasswordsPanel: View {
                 HStack(spacing: 10) {
                     Mark(icon: Favicons.shared.cached(host), letter: host.first.map { String($0).uppercased() } ?? "•", size: 16)
                     Text(host)
-                        .font(.system(size: 13))
+                        .font(.system(size: roomy ? 14 : 13))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     if logins.count > 1 {
                         Text("\(logins.count) accounts")
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                     } else if let only = logins.first, !only.user.isEmpty, !open {
                         Text(only.user)
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: roomy ? 10 : 9, weight: .semibold))
                         .foregroundStyle(Palette.muted)
                         .rotationEffect(.degrees(open ? 90 : 0))
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.vertical, roomy ? 13 : 10)
                 .background(open ? Palette.wash.opacity(0.6) : (hovering ? Palette.hover : .clear))
                 .contentShape(Rectangle())
                 .onTapGesture(perform: toggle)
@@ -135,7 +136,7 @@ struct PasswordsPanel: View {
                     }
                     .padding(.leading, 30)
                     .padding(.trailing, 6)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, roomy ? 7 : 4)
                     .transition(.opacity)
                 }
             }
@@ -145,6 +146,7 @@ struct PasswordsPanel: View {
     /// One account: the name, the password as dots, and the three things to
     /// do with it. Show asks the Mac who you are first.
     private struct Account: View {
+        @Environment(\.roomySettings) private var roomy
         let login: Kept
         let copy: () -> Void
         let forget: () -> Void
@@ -159,7 +161,7 @@ struct PasswordsPanel: View {
         var body: some View {
             HStack(spacing: 10) {
                 Text(login.user.isEmpty ? "No username" : login.user)
-                    .font(.system(size: 12))
+                    .font(.system(size: roomy ? 13 : 12))
                     .foregroundStyle(login.user.isEmpty ? Palette.faint : Palette.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -187,7 +189,7 @@ struct PasswordsPanel: View {
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.vertical, roomy ? 10 : 7)
             .background(hovering ? Palette.hover : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }

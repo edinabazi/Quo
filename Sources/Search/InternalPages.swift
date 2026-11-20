@@ -134,6 +134,9 @@ struct InternalPageView: View {
     var body: some View {
         content
             .environment(\.asTab, true)
+            // Appearance › Size: Roomy gives every one of these pages taller
+            // rows and larger words, as Settings has.
+            .environment(\.roomySettings, browser.prefs.roomyTabs)
             // In English, as the words are: symbols the Mac draws per
             // language (textformat.size) came out as 大小 for someone whose
             // Mac is in Chinese (#1049). The region stays theirs.

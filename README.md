@@ -25,6 +25,16 @@ On for a new install, along with the tabs down the side and Roomy. Switch it in 
 
 **Settings › Appearance › Size › Density**: Roomy, the default for a new install, or Compact, as Search is. Roomy gives the column taller tabs with larger titles, and the rest of the chrome follows: the address bar's field is as tall as a tab, its buttons are larger, the ⌘T / ⌘L field and its suggestions are a size up, and Settings itself has taller rows, larger words and more space between its sections. (It was Roomier tabs, under Tabs; a choice made there is kept.)
 
+### Arc's habits, on from the start
+
+Search has most of what Arc taught people, but starts plain and leaves them off. A new install of Quo starts with them on, for anyone coming from Arc or Dia:
+
+- **Spaces**, switched with ⌃1–9 or a two-finger swipe over the tabs.
+- **⌘T in a floating field** over the page, like Arc's command bar, with your **last three places** in it before you type, and **commands** ("settings", "new tab") typed into the address field.
+- **Pinned rows** under the pin squares, and **folders** in them.
+
+Already on in Search too: pins that keep their site, Peek (shift-click a link), the small window for links from other apps, Tab to search a site, Split View and ⌃Tab. Closing tabs you leave alone stays off: Arc's 12 hours surprises anyone from Chrome, and it's one choice away in Settings › Tabs. A Quo that ran before keeps what it had; Settings › Spaces & Pins › Set Up Like Arc turns the main ones on in one go.
+
 ### Filter lists for the built-in blocker
 
 Search's blocker is a short hand-written list. Quo's can also take the lists every other blocker uses: **Settings › Privacy › Filter lists › Add…**, then an address or a file. Good ones to start with:
@@ -55,9 +65,10 @@ Quo runs beside an installed Search without sharing anything with it:
 | Tabs, history, pins, extensions | `~/Library/Application Support/Search` | `~/Library/Application Support/Quo` |
 | Settings | `com.officecommun.search` | `com.edinabazi.quo` |
 | Cookies and site data | WebKit's container for Search | WebKit's container for Quo |
+| Keychain items | Search's | Quo's own |
 | Updates | Office Commun's feed, signed | None: rebuild it yourself |
 
-Saved passwords are the one thing the two share, through the keychain. The first time Quo reads one that Search saved, macOS asks for your login password, since the two apps are signed by different developers; choose Always Allow.
+They share nothing, the keychain included: Quo keeps its passwords, AI keys and proxy password under its own name, apart from Search's.
 
 Passkeys through the browser's own sheet need an entitlement Apple grants only to Search's signed releases, so they don't work in Quo. Passkeys in a password-manager extension still do.
 
@@ -72,7 +83,7 @@ macOS 14 or later, with Xcode 16 or a Swift 6 toolchain. No dependencies beyond 
 ./quo.sh install    # the same, then into /Applications (quits Quo first)
 ```
 
-Everything the app says about itself reads `Store.name`, so it says Quo here and Search in a plain build. Code, comments and file names still say Search, as do the things that would lose data if renamed: the keychain items' labels, the "Search Sync" folder. "A fork of Search by Office Commun" in About, Search's own release notes and the copyright line keep the credit.
+Everything the app says about itself reads `Store.name`, so it says Quo here and Search in a plain build. Code, comments and file names still say Search, so upstream merges stay clean; what Quo shows or leaves behind while it runs (keychain items, error messages, log subsystems, temporary folders) is named for Quo. The sync folder is "Quo Sync"; one made as "Search Sync" is moved to the new name the first time Quo syncs. "A fork of Search by Office Commun" in About, Search's own release notes and the copyright line keep the credit.
 
 `quo.sh` is `build.sh` with a name, a bundle ID and an icon mark of its own (`SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_MARK=Icon/quo-mark.svg`). The app's data folder, settings and WebKit container all follow the bundle ID; the code still says "Search" by default, so upstream changes merge cleanly.
 

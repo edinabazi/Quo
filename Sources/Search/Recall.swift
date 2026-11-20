@@ -204,6 +204,7 @@ struct HistoryPanel: View {
     /// One line. A title, where it came from, and when — the three things you
     /// scan for, in the order you scan them.
     private struct Row: View {
+        @Environment(\.roomySettings) private var roomy
         let trace: History.Trace
         let go: () -> Void
         let forget: () -> Void
@@ -216,11 +217,11 @@ struct HistoryPanel: View {
                      letter: trace.address.first.map { String($0).uppercased() } ?? "•", size: 16)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(trace.title.isEmpty ? Address.withoutWWW(trace.address) : trace.title)
-                        .font(.system(size: 13))
+                        .font(.system(size: roomy ? 14 : 13))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     Text(Address.withoutWWW(trace.address))
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -230,13 +231,13 @@ struct HistoryPanel: View {
                     Quick("Remove", tint: .red.opacity(0.75), act: forget)
                 } else {
                     Text(When.clock(trace.last))
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .monospacedDigit()
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, roomy ? 12 : 9)
             .background(hovering ? Palette.hover : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: go)
@@ -365,6 +366,7 @@ struct DownloadsPanel: View {
     }
 
     private struct FetchRow: View {
+        @Environment(\.roomySettings) private var roomy
         @ObservedObject var entry: FetchEntry
         let pause: () -> Void
         let resume: () -> Void
@@ -399,13 +401,13 @@ struct DownloadsPanel: View {
         var body: some View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: roomy ? 15 : 14, weight: .regular))
                     .foregroundStyle(Palette.muted)
                     .frame(width: 18)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(entry.name)
-                        .font(.system(size: 13))
+                        .font(.system(size: roomy ? 14 : 13))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -422,7 +424,7 @@ struct DownloadsPanel: View {
                                 .frame(width: 68, height: 3)
                         }
                         Text("\(stateLabel) · \(bytes)")
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .monospacedDigit()
                             .lineLimit(1)
@@ -430,7 +432,7 @@ struct DownloadsPanel: View {
                     }
                     if case .failed = entry.state {
                         Text(entry.errorDescription ?? "The download failed.")
-                            .font(.system(size: 11.5))
+                            .font(.system(size: roomy ? 12.5 : 11.5))
                             .foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                             .textSelection(.enabled)
@@ -440,7 +442,7 @@ struct DownloadsPanel: View {
                 controls
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, roomy ? 13 : 10)
             .contentShape(Rectangle())
             .contextMenu { if let address = entry.address { CopyAddress(address: address) } }
         }
@@ -489,6 +491,7 @@ struct DownloadsPanel: View {
     }
 
     private struct KeptRow: View {
+        @Environment(\.roomySettings) private var roomy
         let keep: Keep
         let open: () -> Void
         let reveal: () -> Void
@@ -499,17 +502,17 @@ struct DownloadsPanel: View {
         var body: some View {
             HStack(spacing: 12) {
                 Image(systemName: keep.stillThere ? "doc" : "doc.badge.ellipsis")
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.system(size: roomy ? 14 : 13, weight: .regular))
                     .foregroundStyle(keep.stillThere ? Palette.muted : Palette.faint)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(keep.name)
-                        .font(.system(size: 13))
+                        .font(.system(size: roomy ? 14 : 13))
                         .foregroundStyle(keep.stillThere ? Palette.ink : Palette.faint)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Text(keep.from.isEmpty ? When.said(keep.date) : "\(keep.from) · \(When.said(keep.date))")
-                        .font(.system(size: 11.5))
+                        .font(.system(size: roomy ? 12.5 : 11.5))
                         .foregroundStyle(Palette.muted)
                         .lineLimit(1)
                 }
@@ -520,7 +523,7 @@ struct DownloadsPanel: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, roomy ? 12 : 9)
             .background(hovering ? Palette.hover : .clear)
             .contentShape(Rectangle())
             .contextMenu { if let address = keep.address { CopyAddress(address: address) } }

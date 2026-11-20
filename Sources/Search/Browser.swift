@@ -2293,11 +2293,18 @@ final class Browser: NSObject, ObservableObject {
     /// above the page): the address is edited there, not in the tab's row.
     var addressBarUp: Bool { prefs.addressBar && prefs.sidebar && !folded }
 
-    /// The window's three buttons at its left in the address bar's row,
-    /// with the column on the right: where a Mac window has them, not in
-    /// the column's far corner. Without the bar there is no row at the left
-    /// to hold them, and they stay in the column's.
-    var lightsInAddressBar: Bool { addressBarUp && prefs.sidePosition == .right }
+    /// The window's three buttons at its left in a row across its top, with
+    /// the column on the right: where a Mac window has them, not in the
+    /// column's far corner. The address bar's row, or, with the bar off, a
+    /// bare one with back, forward and reload (bareRow). Folded away, the
+    /// column hides them, and brings them out with it.
+    var lightsInAddressBar: Bool { prefs.sidebar && !folded && prefs.sidePosition == .right }
+    /// With the column on the right and the address bar off: the row across
+    /// the top that holds the window's buttons, and back, forward and reload
+    /// after them, and nothing else.
+    var bareRow: Bool { lightsInAddressBar && !prefs.addressBar }
+    /// Back, forward and reload are in a row across the top, not the column.
+    var doorsInRow: Bool { addressBarUp || bareRow }
 
     func beginTabEdit(_ tab: Tab) {
         // The column of icons has no row to type in: the field over the

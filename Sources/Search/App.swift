@@ -718,7 +718,7 @@ struct ContentView: View {
     /// The address bar is up: asked for, the tabs down the side and not
     /// folded away, and no video filling the screen.
     private var addressShown: Bool {
-        browser.addressBarUp && fullscreenTab == nil
+        (browser.addressBarUp || browser.bareRow) && fullscreenTab == nil
     }
 
     /// The room the page is laid out to leave them, which is not animated.
