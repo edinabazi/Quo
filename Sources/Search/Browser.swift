@@ -6798,6 +6798,9 @@ final class Browser: NSObject, ObservableObject {
             // From a private tab, the search is private too (see open(_:foreground:atEnd:from:)).
             self.open(url, foreground: true, from: tab)
         }
+        // Go to … in the page's menu, in a new tab beside it, as Chrome does;
+        // from a private tab, private too.
+        tab.onGo = { [weak self] tab, url in self?.open(url, foreground: true, from: tab) }
         tab.onStoreAdd = { [weak self] tab in self?.addFromStore(tab) }
         // The middle button on a link opens it beside the tab you are on, as
         // it does in every other browser (see MiddleRelay).

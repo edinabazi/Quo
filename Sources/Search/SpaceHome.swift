@@ -2,140 +2,147 @@ import AppKit
 import SwiftUI
 
 // An empty tab is the space's home: the card wears the space's colour and
-// grain in full, and around the field that stands on it, its icon and a
-// greeting above, and below, the sites you visit most as tiles and the tabs
-// you closed last. What you type takes the room: the tiles step aside for
-// the field's suggestions. Nothing here is sent anywhere or kept: the tiles
-// are History's own, worked out when the tab is shown.
+// grain, and a column the field's own width runs through it. Above the
+// field, the space's glyph and name and today's date; below it, the sites
+// you visit most, two to a row, and the tabs you closed last. What you type
+// takes the room: the lists step aside for the field's suggestions. Nothing
+// here is sent anywhere or kept: the lists are History's and the window's
+// own, worked out when the tab is shown.
 //
+// Quiet on purpose. The colour is the space's and the sites' own icons; the
+// rest is the column's ink, on the 4-point grid, with one fade as it comes.
 // The parts above and below the field hang from the field itself (see
 // Omnibox), so they are always where it is, whatever the window's chrome.
 
 /// The ground of an empty tab: the space's colour or gradient, as the
-/// chrome wears it but stronger, with its grain, and a soft light from above.
+/// chrome wears it but a step stronger, with its grain.
 struct SpaceHomeGround: View {
     @ObservedObject var browser: Browser
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         ZStack {
             Palette.ground
             SpaceWash(look: browser.wash)
                 .environment(\.washStrength, browser.washStrength == .subtle ? .rich : browser.washStrength)
-                .opacity(0.9)
-            // Light from above, so the page reads as a place, not a fill.
-            RadialGradient(colors: [Color.white.opacity(scheme == .dark ? 0.06 : 0.35), .clear],
-                           center: UnitPoint(x: 0.5, y: -0.1), startRadius: 0, endRadius: 700)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 }
 
-/// Above the field: the space's icon on a tile of its colour, a greeting
-/// for the time of day, and the space's name when there are spaces.
-struct SpaceHomeHeader: View {
-    @ObservedObject var browser: Browser
+/// One fade and a short rise for whatever comes with an empty tab, and
+/// nothing with Reduce Motion.
+private struct HomeEntrance: ViewModifier {
     @State private var shown = false
 
-    private var tint: Color { browser.space.tint ?? Palette.ink }
-
-    static func greeting(at date: Date = Date(), name: String? = SpaceHomeHeader.firstName) -> String {
-        let hour = Calendar.current.component(.hour, from: date)
-        let part: String = switch hour {
-        case 5..<12: "Good morning"
-        case 12..<17: "Good afternoon"
-        case 17..<22: "Good evening"
-        default: "Up late"
-        }
-        guard let name, !name.isEmpty else { return part }
-        return part + ", " + name
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || Motion.reduced ? 0 : 4)
+            .onAppear {
+                guard !Motion.reduced else { return shown = true }
+                withAnimation(.easeOut(duration: 0.22)) { shown = true }
+            }
     }
+}
 
-    /// The Mac's own name for whoever is signed in: the first word of it.
-    static let firstName: String? = NSFullUserName().split(separator: " ").first.map { word in
-        word.prefix(1).uppercased() + word.dropFirst()
+/// Above the field, at its left edge: the space's glyph in its colour and
+/// its name, and today's date. Without spaces, the date alone is the title.
+struct SpaceHomeHeader: View {
+    @ObservedObject var browser: Browser
+    let width: CGFloat
+
+    /// Today as the title's line under it says it: "Friday, 20 November".
+    static func day(_ date: Date = Date()) -> String {
+        date.formatted(.dateTime.weekday(.wide).day().month(.wide))
     }
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 4) {
             if browser.prefs.usesSpaces {
-                Image(systemName: browser.space.symbol)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 52, height: 52)
-                    .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(tint.opacity(0.22), lineWidth: 1))
-                    .scaleEffect(shown ? 1 : 0.8)
-            }
-            VStack(spacing: 4) {
-                Text(SpaceHomeHeader.greeting())
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
-                if browser.prefs.usesSpaces {
+                // The glyph over the rows' icons, the name over their names.
+                HStack(spacing: 12) {
+                    Image(systemName: browser.space.symbol)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(browser.space.tint ?? Palette.muted)
+                        .frame(width: 16)
                     Text(browser.space.name)
-                        .font(.system(size: 13.5, weight: .medium))
-                        .foregroundStyle(Palette.muted)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(1)
                 }
+                Text(SpaceHomeHeader.day())
+                    .font(.system(size: 13))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.leading, 28)
+            } else {
+                Text(SpaceHomeHeader.day())
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
             }
         }
-        .opacity(shown ? 1 : 0)
-        .offset(y: shown ? 0 : 8)
-        .onAppear {
-            guard !Motion.reduced else { return shown = true }
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.75)) { shown = true }
-        }
+        .padding(.horizontal, 12)
+        .frame(width: width, alignment: .leading)
+        .modifier(HomeEntrance())
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Below the field: the sites you visit most, as tiles, and the tabs you
-/// closed last. A click loads the site in this tab, or brings the tab back.
+/// Below the field: the sites you visit most, two to a row, and the tabs
+/// you closed last, each a row of the column's kind. A click loads the site
+/// in this tab, or brings the tab back.
 struct SpaceHomeBelow: View {
     @ObservedObject var browser: Browser
-    @State private var shown = false
-
-    static let columns = 4
-    static let tile: CGFloat = 92
+    let width: CGFloat
+    /// The row under the pointer: one ground for all of them, which travels
+    /// from row to row as the tab column's does (HomeRow).
+    @State private var hovered: String?
+    @Namespace private var ground
 
     private var sites: [History.Site] { browser.history.mostVisited(limit: 8) }
     private var closed: [Browser.Ghost] { Array(browser.recentlyClosed.prefix(3)) }
 
     var body: some View {
         let sites = self.sites, closed = self.closed
-        VStack(spacing: 26) {
+        let half = (width - 8) / 2
+        VStack(alignment: .leading, spacing: 24) {
             if !sites.isEmpty {
-                Grid(horizontalSpacing: 14, verticalSpacing: 14) {
-                    ForEach(0..<((sites.count + SpaceHomeBelow.columns - 1) / SpaceHomeBelow.columns), id: \.self) { row in
-                        GridRow {
-                            ForEach(Array(sites.enumerated()).filter { $0.offset / SpaceHomeBelow.columns == row }, id: \.element.id) { index, site in
-                                SiteTile(site: site, order: index, shown: shown) { go(site.url) }
+                Section("Most visited") {
+                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 0) {
+                        ForEach(0..<((sites.count + 1) / 2), id: \.self) { row in
+                            GridRow {
+                                ForEach(sites[(row * 2)..<min(row * 2 + 2, sites.count)]) { site in
+                                    HomeRow(id: "site:" + site.host, hovered: $hovered, ground: ground,
+                                            icon: Favicons.shared.cached(for: site.url), letter: site.name,
+                                            title: site.name, note: site.host) { go(site.url) }
+                                        .frame(width: half)
+                                        .help(site.url.absoluteString)
+                                }
                             }
                         }
                     }
                 }
             }
             if !closed.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Recently closed")
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(Palette.faint)
-                        .padding(.leading, 10)
-                        .padding(.bottom, 4)
-                    ForEach(closed) { ghost in
-                        ClosedRow(title: browser.closedTitle(for: ghost) == "Closed Tab" ? ghost.title : browser.closedTitle(for: ghost),
-                                  url: ghost.url) { browser.reopen(ghost) }
+                Section("Recently closed") {
+                    VStack(spacing: 0) {
+                        ForEach(closed) { ghost in
+                            let batch = browser.closedTitle(for: ghost)
+                            let title = batch == "Closed Tab" ? ghost.title : batch
+                            HomeRow(id: "closed:" + ghost.id.uuidString, hovered: $hovered, ground: ground,
+                                    icon: Favicons.shared.cached(for: ghost.url), letter: nil,
+                                    title: title.isEmpty ? (ghost.url.host() ?? ghost.url.absoluteString) : title,
+                                    note: ghost.url.host().map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 } ?? "") {
+                                browser.reopen(ghost)
+                            }
+                            .help("Reopen \(ghost.url.absoluteString)")
+                        }
                     }
                 }
-                .frame(width: SpaceHomeBelow.tile * CGFloat(SpaceHomeBelow.columns) + 14 * CGFloat(SpaceHomeBelow.columns - 1),
-                       alignment: .leading)
-                .opacity(shown ? 1 : 0)
             }
         }
-        .onAppear {
-            guard !Motion.reduced else { return shown = true }
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.05)) { shown = true }
-        }
+        .frame(width: width, alignment: .leading)
+        .modifier(HomeEntrance())
     }
 
     private func go(_ url: URL) {
@@ -148,95 +155,105 @@ struct SpaceHomeBelow: View {
     }
 }
 
-/// A site's tile: its icon on a soft card, its name under it.
-private struct SiteTile: View {
-    let site: History.Site
-    let order: Int
-    let shown: Bool
-    let open: () -> Void
-    @State private var hovering = false
+/// A list's name, in the column's secondary ink, close to its rows.
+private struct Section<Content: View>: View {
+    let title: String
+    let content: Content
 
-    private var name: String { site.name }
-
-    /// A colour of its own for a site with no icon yet, the same each time.
-    private var hue: Color {
-        let sum = site.host.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
-        return Color(hue: Double(sum % 360) / 360, saturation: 0.55, brightness: 0.85)
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
     }
 
     var body: some View {
-        Button(action: open) {
-            VStack(spacing: 8) {
-                Group {
-                    if let icon = Favicons.shared.cached(for: site.url) {
-                        Image(nsImage: icon).resizable().interpolation(.high)
-                            .frame(width: 26, height: 26)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    } else {
-                        Text(String(name.prefix(1)).uppercased())
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(hue.gradient, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    }
-                }
-                .frame(width: 52, height: 52)
-                .background(Palette.ground.opacity(hovering ? 0.95 : 0.75), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
-                .shadow(color: .black.opacity(hovering ? 0.12 : 0.05), radius: hovering ? 10 : 4, y: hovering ? 4 : 1)
-                Text(name)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(hovering ? Palette.ink : Palette.muted)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            .frame(width: SpaceHomeBelow.tile)
-            .contentShape(Rectangle())
-            .scaleEffect(hovering ? 1.04 : 1)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Palette.muted)
+                .padding(.horizontal, 12)
+                .frame(height: 20, alignment: .bottom)
+            content
         }
-        .buttonStyle(.plain)
-        .onHover { on in withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { hovering = on } }
-        .opacity(shown ? 1 : 0)
-        .offset(y: shown ? 0 : 10)
-        .animation(Motion.reduced ? nil : .spring(response: 0.5, dampingFraction: 0.8).delay(Double(order) * 0.03), value: shown)
-        .help(site.host)
-        .accessibilityLabel(site.host)
     }
 }
 
-/// A tab closed lately: its icon and title, and back with a click.
-private struct ClosedRow: View {
+/// One row: the page's icon, or its first letter on a quiet tile, its name,
+/// and its address dimmed after it. Hovered, the list's one ground comes to
+/// it from the row it was behind, as in the tab column.
+private struct HomeRow: View {
+    let id: String
+    @Binding var hovered: String?
+    let ground: Namespace.ID
+    let icon: NSImage?
+    /// The name its letter comes from when it has no icon; nil for a mark.
+    let letter: String?
     let title: String
-    let url: URL
+    let note: String
     let open: () -> Void
-    @State private var hovering = false
 
     var body: some View {
         Button(action: open) {
-            HStack(spacing: 9) {
-                Group {
-                    if let icon = Favicons.shared.cached(for: url) {
-                        Image(nsImage: icon).resizable().interpolation(.high)
-                    } else {
-                        Image(systemName: "arrow.uturn.backward").font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Palette.faint)
+            HStack(spacing: 12) {
+                mark
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    if !note.isEmpty, note.lowercased() != title.lowercased() {
+                        Text(note)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.muted)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
-                .frame(width: 14, height: 14)
-                Text(title.isEmpty ? (url.host() ?? url.absoluteString) : title)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(hovering ? Palette.ink : Palette.muted)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(hovering ? Palette.ground.opacity(0.6) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background {
+                if hovered == id {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Palette.ink.opacity(0.07))
+                        .matchedGeometryEffect(id: "hover", in: ground)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help("Reopen \(url.absoluteString)")
+        .onHover { on in
+            if on {
+                withAnimation(Motion.glide) { hovered = id }
+            } else {
+                // Leaving for the next row: that row takes the ground before
+                // this lets go, so it travels rather than fading out and in.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                    guard hovered == id else { return }
+                    withAnimation(Motion.quick) { hovered = nil }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mark: some View {
+        if let icon {
+            Image(nsImage: icon).resizable().interpolation(.high)
+                .frame(width: 16, height: 16)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else if let letter, let first = letter.first {
+            Text(String(first).uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Palette.muted)
+                .frame(width: 16, height: 16)
+                .background(Palette.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Palette.muted)
+                .frame(width: 16, height: 16)
+        }
     }
 }

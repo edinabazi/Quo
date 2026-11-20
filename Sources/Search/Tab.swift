@@ -661,6 +661,8 @@ final class Tab: ObservableObject, Identifiable {
     var imageFrame: WKFrameInfo? { images.frame }
     var searchName: (() -> String?)?
     var onSearch: ((Tab, String) -> Void)?
+    /// Go to … from the page's menu: an address in the words chosen.
+    var onGo: ((Tab, URL) -> Void)?
     /// "Add to Search" was pressed on the Chrome Web Store page this tab shows.
     var onStoreAdd: ((Tab) -> Void)?
     /// The middle button was let go over a link. The browser opens it in a
@@ -971,6 +973,10 @@ final class Tab: ObservableObject, Identifiable {
         web.onSearch = { [weak self] text in
             guard let self else { return }
             self.onSearch?(self, text)
+        }
+        web.onGo = { [weak self] url in
+            guard let self else { return }
+            self.onGo?(self, url)
         }
         web.onFirstFrame = { [weak self] in
             self?.painted = true
@@ -2124,6 +2130,7 @@ final class Tab: ObservableObject, Identifiable {
         web.onTranslate = nil
         web.onImage = nil
         web.onSearch = nil
+        web.onGo = nil
         web.stopLoading()
         // Every handler below is an empty closure rather than nil: some WebKit
         // builds (seen on macOS 14 and 15) call the handler without checking it,
@@ -2460,6 +2467,19 @@ final class PageView: WKWebView {
                 item.representedObject = image
             }
         }
+        // Go to razegrowth.com, as Chrome has it, over Search with: the
+        // words chosen, when they are an address the field would take.
+        // WebKit names them in its own Look Up item, there as the menu is.
+        if let place = PageView.address(in: menu) {
+            let go = NSMenuItem(title: "Go to \(PageView.shown(place))", action: #selector(goToSelection(_:)), keyEquivalent: "")
+            go.identifier = NSUserInterfaceItemIdentifier("SearchGoToSelection")
+            go.target = self
+            go.representedObject = place
+            let at = menu.items.firstIndex { $0.identifier?.rawValue == "WKMenuItemIdentifierSearchWeb" }
+                ?? menu.items.firstIndex { $0.identifier?.rawValue == "WKMenuItemIdentifierCopy" }
+                ?? 0
+            menu.insertItem(go, at: at)
+        }
         // The bench's linkmenu: the item it names is chosen as the menu
         // comes up, the way a hand would choose it, and the menu goes.
         if Store.testing, let title = PageView.picking {
@@ -2617,6 +2637,43 @@ final class PageView: WKWebView {
         defer { besideSince = nil }
         return besideSince.map { Date().timeIntervalSince($0) < 1 } ?? false
     }
+
+    /// The address in the words a menu's Look Up item names, if they are
+    /// one the field would take, on the web: "Look Up “razegrowth.com”"
+    /// gives https://razegrowth.com. Words cut short ("…"), an email address
+    /// or anything with a space are none.
+    static func address(in menu: NSMenu) -> URL? {
+        guard let title = menu.items.first(where: {
+            $0.identifier?.rawValue == "WKMenuItemIdentifierLookUp" || $0.title.hasPrefix("Look Up “")
+        })?.title,
+              let open = title.firstIndex(of: "“"), let close = title.lastIndex(of: "”"), open < close
+        else { return nil }
+        let words = String(title[title.index(after: open)..<close]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return address(from: words)
+    }
+
+    static func address(from words: String) -> URL? {
+        guard !words.hasSuffix("…"), !words.contains("@"),
+              let url = Address.url(from: words), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              let host = url.host(), host.contains(".") || host == "localhost" else { return nil }
+        return url
+    }
+
+    /// The address as the item says it: without its scheme and a lone slash.
+    static func shown(_ url: URL) -> String {
+        var text = url.absoluteString
+        for scheme in ["https://", "http://"] where text.hasPrefix(scheme) { text.removeFirst(scheme.count) }
+        if text.hasSuffix("/"), text.dropLast().contains("/") == false { text.removeLast() }
+        return text.count > 40 ? String(text.prefix(39)) + "…" : text
+    }
+
+    @objc private func goToSelection(_ item: NSMenuItem) {
+        guard let url = item.representedObject as? URL else { return }
+        onGo?(url)
+    }
+
+    /// Go to …: the address, opened as a link from this page would be.
+    var onGo: ((URL) -> Void)?
 
     @objc private func searchSelection(_ item: NSMenuItem) {
         defer { selection = nil }

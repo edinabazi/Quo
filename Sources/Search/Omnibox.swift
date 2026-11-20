@@ -120,16 +120,16 @@ struct Omnibox: View {
                 // for the list to take that room (SpaceHome.swift).
                 .overlay(alignment: .bottom) {
                     if home {
-                        SpaceHomeHeader(browser: browser)
+                        SpaceHomeHeader(browser: browser, width: width)
                             .fixedSize()
-                            .offset(y: -(m.height + 30))
+                            .offset(y: -(m.height + 24))
                     }
                 }
                 .overlay(alignment: .top) {
                     if home, browser.offers.isEmpty, browser.siteOffer == nil, browser.switcherNote == nil, typing.typed.isEmpty {
-                        SpaceHomeBelow(browser: browser)
+                        SpaceHomeBelow(browser: browser, width: width)
                             .fixedSize()
-                            .offset(y: m.height + 34)
+                            .offset(y: m.height + 24)
                             .transition(.opacity)
                     }
                 }
