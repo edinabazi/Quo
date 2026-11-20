@@ -1390,6 +1390,126 @@ final class Bench {
             }
             step(0)
 
+        case "spacestroke":
+            // One stroke of two fingers over the tabs (DX sideways, DY up or
+            // down for the bar across the top), as the
+            // trackpad sends it: may-begin, began, DX points in STEPS moves
+            // over MS milliseconds, ended, and GLIDE momentum events after,
+            // each read by the swipe as the real ones are (SpaceSwipe.feed).
+            // Back: the rows' place and the space every 1/120 s until 2 s
+            // after, how many slides set off, and which events were taken.
+            // Test runs only.
+            guard Store.testing else { answer(["error": "spacestroke is for test runs"]); return }
+            guard let window = browser.window else { answer(["error": "no window"]); return }
+            let dx = request["dx"] as? Double ?? -120
+            let dy = request["dy"] as? Double ?? 0
+            let steps = max(2, request["steps"] as? Int ?? 10)
+            let ms = max(1, request["ms"] as? Double ?? 150)
+            let glide = request["glide"] as? Int ?? 40
+            let every = request["glideEvery"] as? Double ?? 1.0 / 60
+            // A swipe between pages told this long after the glide's last
+            // event, as the trackpad's settings can send one for the stroke.
+            let swipeAfter = request["swipeAfter"] as? Double
+            SpaceSwipe.shared.start(for: browser)
+            // Over the column, halfway down; or over the bar across the top.
+            let inWindow = browser.prefs.sidebar
+                ? NSPoint(x: min(60, browser.prefs.columnWidth / 2), y: window.frame.height / 2)
+                : NSPoint(x: window.frame.width / 2, y: window.frame.height - Metrics.strip / 2)
+            var taken: [String] = []
+            func send(_ phase: Int64, _ momentum: Int64, _ x: Double, _ y: Double = 0) {
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: Int32(y), wheel2: Int32(x), wheel3: 0) else { return }
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+                cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: y)
+                cg.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(y))
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: x)
+                cg.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64(x))
+                guard let event = NSEvent(cgEvent: cg) else { return }
+                let kept = SpaceSwipe.shared.feed(event, in: window, at: inWindow)
+                taken.append("\(phase)/\(momentum):\(kept ? "taken" : "let")")
+            }
+            let starts = SwipeGlide.started
+            let index = { (id: UUID?) -> Int in id.flatMap { id in browser.spaces.firstIndex { $0.id == id } } ?? -1 }
+            var samples: [[Double]] = []
+            let began = CACurrentMediaTime()
+            let total = ms / 1000 + Double(glide) * every + 2
+            let sampler = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
+                MainActor.assumeIsolated {
+                    samples.append([CACurrentMediaTime() - began, Double(browser.spaceSwipe),
+                                    Double(index(browser.spaceID)), Double(index(browser.spaceComing))])
+                }
+            }
+            RunLoop.main.add(sampler, forMode: .common)
+            send(128, 0, 0)
+            send(1, 0, 0)
+            let each = ms / 1000 / Double(steps)
+            for n in 1...steps {
+                DispatchQueue.main.asyncAfter(deadline: .now() + each * Double(n)) {
+                    send(2, 0, dx / Double(steps), dy / Double(steps))
+                    if n == steps { send(4, 0, 0) }
+                }
+            }
+            for n in 0..<glide {
+                DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000 + every * Double(n + 1)) {
+                    let k = pow(0.9, Double(n + 1))
+                    send(0, n == 0 ? 1 : (n == glide - 1 ? 3 : 2), dx / Double(steps) * k, dy / Double(steps) * k)
+                }
+            }
+            if let swipeAfter {
+                DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000 + every * Double(glide) + swipeAfter) {
+                    guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 0, wheel2: 0, wheel3: 0),
+                          let carrier = NSEvent(cgEvent: cg) else { return }
+                    let kept = SpaceSwipe.shared.feedSwipe(dx < 0 || dy < 0 ? -1 : 1, carrier: carrier, in: window, at: inWindow)
+                    taken.append("swipe:\(kept ? "taken" : "let")")
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + total + (swipeAfter ?? 0)) {
+                sampler.invalidate()
+                answer(["slides": SwipeGlide.started - starts, "samples": samples, "events": taken, "making": browser.makingSpace,
+                        "space": index(browser.spaceID), "width": Double(SpaceSwipe.page(browser))])
+            }
+
+        case "edgetime":
+            // The column's edge taken from one width to another a frame at a
+            // time ("steps" of "every" seconds), as a hand drags it: each
+            // pass of the main run loop until 0.8 s after. Test runs only.
+            guard Store.testing else { answer(["error": "edgetime is for test runs"]); return }
+            let from = request["from"] as? Double ?? 340
+            let to = request["to"] as? Double ?? 220
+            let steps = max(1, request["steps"] as? Int ?? 60)
+            let every = request["every"] as? Double ?? 1.0 / 60
+            let held = request["held"] as? Bool ?? true
+            browser.prefs.sideWidth = CGFloat(from)
+            let start = CFAbsoluteTimeGetCurrent()
+            let done = Bench.timePasses(for: Double(steps) * every + 0.8, from: start, watching: browser)
+            // Where the page in front is drawn at each step, and its window's
+            // width: the page's ends against the column's edge and the far one.
+            var drawn: [[String: Double]] = []
+            func look(_ width: CGFloat?) {
+                guard let web = browser.active?.web, let window = web.window else { return }
+                let frame = web.convert(web.bounds, to: nil)
+                drawn.append(["edge": Double(width ?? browser.prefs.columnWidth), "minX": Double(frame.minX),
+                              "maxX": Double(frame.maxX), "window": Double(window.frame.width)])
+            }
+            func step(_ n: Int) {
+                guard n <= steps else {
+                    if held {
+                        NotificationCenter.default.post(name: Bench.edgeHeld, object: nil)
+                        browser.prefs.sideWidth = CGFloat(to)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { look(nil) }
+                    done { passes in answer(["passes": passes, "drawn": drawn]) }
+                    return
+                }
+                if n > 1 { look(CGFloat(from + (to - from) * Double(n - 1) / Double(steps))) }
+                let width = CGFloat(from + (to - from) * Double(n) / Double(steps))
+                if held { NotificationCenter.default.post(name: Bench.edgeHeld, object: width) }
+                else { browser.prefs.sideWidth = width }
+                DispatchQueue.main.asyncAfter(deadline: .now() + every) { step(n + 1) }
+            }
+            step(1)
+
         case "bookmarksweep":
             // Bookmarks kept and then let go, one a frame, as the star or a
             // folder's menu would: how many rows of the column and how many
