@@ -4529,7 +4529,7 @@ final class Bench {
                     "size": [Double(size.width), Double(size.height)],
                     "least": [Double(StylePanel.least.width), Double(StylePanel.least.height)]])
 
-        case "extensions", "ext-add", "ext-crx", "ext-fetches", "ext-folder", "ext-press", "ext-remove", "ext-reload", "ext-page", "ext-popup", "ext-menu", "ext-pin", "ext-shot", "ext-answer", "ext-enable", "ext-private", "ext-sites", "ext-notifications", "capture", "capture-stop":
+        case "extensions", "ext-add", "ext-crx", "ext-fetches", "ext-folder", "ext-press", "ext-remove", "ext-reload", "ext-page", "ext-popup", "ext-menu", "ext-pin", "ext-shot", "ext-answer", "ext-enable", "ext-private", "ext-sites", "ext-notifications", "slowext", "capture", "capture-stop":
             guard #available(macOS 15.4, *) else {
                 answer(["error": "extensions need macOS 15.4"])
                 return
@@ -5044,6 +5044,48 @@ final class Bench {
                 return
             }
             answer(["recorded": ExtensionNotifications.recorded, "status": ExtensionNotifications.status])
+        case "slowext":
+            // Extensions that slow pages down (SlowExtensions.swift): what
+            // each has cost in the window, the card's offer, and its buttons.
+            guard Store.testing else { answer(["error": "slowext only works on a --test run"]); return }
+            let slow = SlowExtensions.shared
+            switch request["action"] as? String ?? "" {
+            case "accept": slow.accept()
+            case "later": slow.later()
+            case "never": slow.never()
+            case "reset":
+                slow.reset()
+                Store.settings.removeObject(forKey: SlowExtensions.neverKey)
+            case "picture":
+                // The card for the first extension, light and dark, drawn off
+                // screen to PNGs in PATH — no window.
+                guard let path = request["path"] as? String else { answer(["error": "slowext picture PATH"]); return }
+                guard #available(macOS 15.4, *) else { answer(["error": "needs macOS 15.4"]); return }
+                let first = Extensions.shared.installed.first
+                let shown = SlowExtensions.Suggestion(id: first?.id ?? "", name: first?.name ?? "Fonts Ninja", seconds: 4.6)
+                var made: [String] = []
+                for dark in [false, true] {
+                    let renderer = ImageRenderer(content: SlowExtensionCard(drawn: shown).padding(24).background(Palette.wash)
+                        .environment(\.colorScheme, dark ? .dark : .light))
+                    renderer.scale = 2
+                    guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+                          let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { continue }
+                    let url = URL(fileURLWithPath: path).appendingPathComponent(dark ? "slow-card-dark.png" : "slow-card.png")
+                    if (try? png.write(to: url)) != nil { made.append(url.path) }
+                }
+                answer(["made": made])
+                return
+            default: break
+            }
+            guard #available(macOS 15.4, *) else { answer(["error": "needs macOS 15.4"]); return }
+            let extensions = Extensions.shared
+            answer([
+                "suggestion": slow.suggestion.map { ["id": $0.id, "name": $0.name, "seconds": $0.seconds] as [String: Any] } ?? NSNull(),
+                "extensions": extensions.installed.map { item -> [String: Any] in
+                    ["id": item.id, "name": item.name, "cost": slow.cost(of: item.id), "access": extensions.siteAccess(item.id).mode.rawValue]
+                },
+            ])
+
         case "extensions":
             answer(["started": extensions.started, "busy": extensions.busy.sorted(), "watching": ExtensionWatch.status, "extensions": extensions.installed.map { item -> [String: Any] in
                 let context = extensions.contexts[item.id]

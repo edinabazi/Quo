@@ -150,11 +150,14 @@ final class ExtensionWorkerRecovery {
         /// script's own script that a page's policy refused (see
         /// ExtensionPageScript).
         let pageScript: ExtensionPageScript.Handler
+        /// And what its scripts cost the pages (SlowExtensions).
+        let costs: SlowExtensions.CostHandler
 
         init(id: String, owner: ExtensionWorkerRecovery) {
             self.id = id
             self.owner = owner
             pageScript = ExtensionPageScript.Handler(id: id)
+            costs = SlowExtensions.CostHandler(id: id)
             // WebKit uses this shared named world for isolated scripts.
             // Retained through recovery; no website main-world handler is added.
             world = .world(name: "WebExtension-" + id)
@@ -164,11 +167,13 @@ final class ExtensionWorkerRecovery {
         func attach(_ controller: WKUserContentController) {
             controller.addScriptMessageHandler(self, contentWorld: world, name: "searchWorkerRecovery")
             pageScript.attach(controller)
+            costs.attach(controller)
         }
 
         func detach(_ controller: WKUserContentController) {
             controller.removeScriptMessageHandler(forName: "searchWorkerRecovery", contentWorld: world)
             pageScript.detach(controller)
+            costs.detach(controller)
         }
 
         func userContentController(_ userContentController: WKUserContentController,

@@ -548,6 +548,15 @@ struct ContentView: View {
             // (see SidePanel.swift); two pages in Split View share what's left.
             if panelRoom > 0 { sidePanel }
 
+            // An extension that is slowing pages down, offered On click
+            // (SlowExtensions.swift): at the page's far side, away from the
+            // column, over the page's foot.
+            SlowExtensionCard()
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: sideOnRight ? .bottomLeading : .bottomTrailing)
+                .padding(.leading, sideOnRight ? 0 : roomed.width)
+                .padding(.trailing, sideOnRight ? roomed.width : 0)
+
             // The column of tabs is Fold's, in its place beside the page or
             // folded away (see Fold.swift).
 

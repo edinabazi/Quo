@@ -1097,6 +1097,12 @@ final class Extensions: NSObject, ObservableObject {
         installed.removeAll { $0.id == id }
         installed.append(item)
         save()
+        // A tool you reach for — SEO, fonts, an inspector — starts On click,
+        // so pages don't carry it until you press it (SlowExtensions).
+        let manifest = (try? JSONSerialization.jsonObject(with: Data(contentsOf: finalFolder.appendingPathComponent("manifest.json")))) as? [String: Any] ?? [:]
+        let onClick = SiteAccess.of(id).mode == .all
+            && SlowExtensions.startsOnClick(manifest: manifest, name: name, about: found.displayDescription ?? "")
+        if onClick { SiteAccess(mode: .click).save(id) }
         // Loaded in WebKit's first five seconds, a new extension would be
         // told the browser started, and never that it was installed.
         let early = 5.5 - Date().timeIntervalSince(controllerMade)
@@ -1104,7 +1110,7 @@ final class Extensions: NSObject, ObservableObject {
         guard installed.contains(where: { $0.id == id }) else { return true }
         installing.insert(id)
         if await load(item) {
-            browser?.announce("\(name) is installed")
+            browser?.announce(onClick ? "\(name) is installed — it runs when you click its button" : "\(name) is installed")
         } else {
             browser?.announce("\(name) is installed, but WebKit couldn't start it")
         }

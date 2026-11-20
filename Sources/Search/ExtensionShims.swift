@@ -811,6 +811,64 @@ enum ExtensionShims {
             if (reply && reply.error) throw new Error(reply.error);
             return reply ? reply.value : undefined;
           });
+      // What a web page pays for this extension: the time its handlers for
+      // the busy events (the pointer, scrolling) and its change observers
+      // take in the page, told to the browser now and then, in this
+      // extension's own world only, and only in a page on the web. The
+      // listeners are the extension's own, wrapped once each so removing
+      // one still finds it (SlowExtensions.swift).
+      if (typeof document !== "undefined" && typeof location !== "undefined" && /^https?:$/.test(location.protocol)
+          && typeof EventTarget === "function" && !root.__searchCost) {
+        Object.defineProperty(root, "__searchCost", { value: true });
+        const busy = new Set(["mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave", "pointermove", "pointerover",
+          "pointerout", "pointerenter", "pointerleave", "pointerrawupdate", "scroll", "wheel", "touchmove", "selectionchange"]);
+        let spent = 0;
+        // The world's own handler (SlowExtensions.CostHandler), taken now:
+        // the browser knows the extension by the world the report comes from.
+        const costs = root.webkit && root.webkit.messageHandlers && root.webkit.messageHandlers.searchCost;
+        const now = () => performance.now();
+        const timed = (listener) => function (...args) {
+          const start = now();
+          try {
+            return typeof listener === "function" ? listener.apply(this, args) : listener.handleEvent(...args);
+          } finally { spent += now() - start; }
+        };
+        const proto = EventTarget.prototype, add = proto.addEventListener, remove = proto.removeEventListener;
+        const wrappers = new WeakMap();
+        const keyOf = (type, options) => type + (typeof options === "boolean" ? options : !!(options && options.capture));
+        const wrapperFor = (listener, key, make) => {
+          let byKey = wrappers.get(listener);
+          if (!byKey) { if (!make) return null; byKey = new Map(); wrappers.set(listener, byKey); }
+          let wrapper = byKey.get(key);
+          if (!wrapper && make) { wrapper = timed(listener); byKey.set(key, wrapper); }
+          return wrapper || null;
+        };
+        const listens = (listener) => listener && (typeof listener === "function" || typeof listener.handleEvent === "function");
+        proto.addEventListener = function (type, listener, options) {
+          if (!busy.has(type) || !listens(listener)) return add.call(this, type, listener, options);
+          return add.call(this, type, wrapperFor(listener, keyOf(type, options), true), options);
+        };
+        proto.removeEventListener = function (type, listener, options) {
+          const wrapper = busy.has(type) && listens(listener) ? wrapperFor(listener, keyOf(type, options), false) : null;
+          return remove.call(this, type, wrapper || listener, options);
+        };
+        const Observer = root.MutationObserver;
+        if (typeof Observer === "function") {
+          root.MutationObserver = class extends Observer {
+            constructor(callback) { super(typeof callback === "function" ? timed(callback) : callback); }
+          };
+        }
+        // Told every half minute it's been anything to speak of, and as the
+        // page goes. A page in the background isn't measured: nothing runs.
+        const tell = () => {
+          if (spent < 2) return;
+          const ms = Math.round(spent);
+          spent = 0;
+          try { if (costs) costs.postMessage(ms); } catch (e) {}
+        };
+        setInterval(tell, 30000);
+        add.call(root, "pagehide", tell);
+      }
       // Chrome's APIs take a callback last, or return a promise without one.
       const call = (api) => (...args) => {
         const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
