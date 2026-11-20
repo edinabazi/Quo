@@ -83,7 +83,9 @@ def case_reachable(t):
     t.ok("results carry section and group", found and all(i["page"] and i["groupTitle"] for i in found), found)
     t.ok("…in Browsing › Video", any(i["page"] == "browsing" and i["groupTitle"] == "Video" for i in found))
     shown = [i for i in items if not i["findOnly"]]
-    t.ok("about fifty rows in the sections", 45 <= len(shown) <= 75, len(shown))
+    # Fifty when this was written; Settings has grown to a hundred and more
+    # since. Still a check that the sections are neither empty nor doubled.
+    t.ok("a hundred-odd rows in the sections", 45 <= len(shown) <= 140, len(shown))
     t.ok("ten sections", len(every["pages"]) == 10, every["pages"])
     # Old addresses land in the new sections.
     sv.cmd({"do": "ui", "show": "search://settings/shortcuts"}); time.sleep(0.6)

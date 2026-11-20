@@ -1,3 +1,4 @@
+import WebKit
 import XCTest
 @testable import Search
 
@@ -162,6 +163,11 @@ final class ProfilesTests: XCTestCase {
     }
 
     func testDeletingAProfileTakesItsSpacesAndFiles() throws {
+        // WebKit up first, as it always is in the app by the time a profile
+        // is deleted: removing a data store before any web view exists
+        // crashes inside WebKit (its main run loop isn't made yet), which is
+        // what this test did run on its own.
+        _ = WKWebView()
         let made = Profiles.shared.add(named: "Gone")
         let url = try XCTUnwrap(URL(string: "https://gone.example/"))
         Profiles.history(made.id).record(url, title: "Gone")

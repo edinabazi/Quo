@@ -126,8 +126,8 @@ enum SettingsIndex {
               more: "From another browser on this Mac, or from a file it exported. Nothing leaves your Mac.",
               words: ["import", "chrome", "safari", "arc", "migrate"]),
         .init(id: "sync", group: "browser", icon: "arrow.triangle.2.circlepath",
-              title: "Sync with your other Macs", detail: "Spaces, pins, bookmarks and settings, through a folder you choose",
-              more: "Choose a folder your Macs share, in iCloud Drive or Dropbox for example, and turn this on with the same folder in \(Store.name) on each Mac. Each profile syncs on its own. Never your history, passwords, cookies, sign-ins or open tabs. No account and no server: only small files in that folder.",
+              title: "Sync with your other Macs", detail: "Spaces, pins, bookmarks and settings, through iCloud or a folder you choose",
+              more: "iCloud: your Macs signed in to the same Apple ID keep each other up to date within moments, in your own iCloud, with no account of ours. A folder: choose one your Macs share, in iCloud Drive or Dropbox for example, and turn this on with the same folder in \(Store.name) on each Mac. Each profile syncs on its own. Never your history, passwords, cookies, sign-ins or open tabs.",
               keys: ["sync.folder"], words: ["sync", "icloud", "dropbox", "other mac", "devices", "mac"]),
         .init(id: "quit.confirm", group: "browser", icon: "power",
               title: "Confirm before quitting", detail: "Ask before ⌘Q or Quit \(Store.name) closes the browser",
@@ -387,9 +387,13 @@ enum SettingsIndex {
               words: ["arc", "air traffic control", "route", "routing", "rules", "domain", "site", "open in space", "default space", "links from other apps"],
               parent: "spaces"),
         .init(id: "pins.keep", group: "pins", icon: "pin.circle",
-              title: "Pins keep their site", detail: "Links elsewhere open over the pin, and ⌘W takes it back home",
-              more: "As in Arc and Safari: a link from a pin to another site opens in a peek over it, and a pin closed with ⌘W, or left open when \(Store.name) quits, comes back at the page it was pinned at.",
+              title: "Pins keep their site", detail: "Links elsewhere open beside or over the pin, and ⌘W takes it back home",
+              more: "As in Arc and Safari: a link from a pin to another site opens in a new tab or a peek (see below), and a pin closed with ⌘W, or left open when \(Store.name) quits, comes back at the page it was pinned at.",
               keys: ["pins.home", "pins.peek"], words: ["pinned tabs", "go home", "reset pin"]),
+        .init(id: "pins.links", group: "pins", icon: "arrow.up.forward.square",
+              title: "Links to other sites open in", detail: "A new tab beside the pin, or a peek over it",
+              more: "A link in a pin that leads to another site never takes the pin there. A new tab is how Dia does it; a peek, a panel over the pin you can keep as a tab or put away, is Arc's.",
+              keys: ["pins.links"], words: ["pinned tabs", "peek", "new tab", "dia", "arc", "links"], parent: "pins.keep"),
         .init(id: "pins.list", group: "pins", icon: "list.bullet.rectangle",
               title: "Pinned rows", detail: "Pins as rows under the squares, and Clear over the rest",
               more: "As in Arc: squares for the sites you live in, rows for pages you keep, and a line over the rest with Clear. Right-click a tab to pin it as a row.",
@@ -639,6 +643,7 @@ enum SettingsIndex {
         case "links.little.tabs": return prefs.littleLinks
         case "mail.default": return prefs.webmail != .none
         case "links.peek.stays": return prefs.peeksLinks || prefs.pinsPeek
+        case "pins.links": return prefs.pinsKeepSite
         case "launcher.key": return prefs.launcher
         case "shield.lists": return prefs.shielded
         // Only Search's own releases update themselves: a fork is built again.
@@ -657,6 +662,7 @@ enum SettingsIndex {
         case "profiles.oneWindow": return "Only with more than one profile"
         case "spaces.links": return "Only with Spaces on"
         case "sidebar.player": return "Only with titles in the sidebar"
+        case "pins.links": return "Only with Pins keep their site on"
         case "updates.version", "updates.auto": return "\(Store.name) is updated by building it again"
         case "tabs.frontBeside": return "Only with New tab position on After current"
         case "newtab.recent": return "Only with the new tab in a floating field"

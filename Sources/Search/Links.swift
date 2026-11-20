@@ -186,6 +186,11 @@ final class Links: NSObject, NSApplicationDelegate {
     /// a page on this Mac — an .html or .xhtml double-clicked in the Finder
     /// once Search is the Mac's browser (it says it can open them, see
     /// build.sh), which this used to drop without a word.
+    /// A silent push from iCloud: another Mac changed what syncs.
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        MainActor.assumeIsolated { Sync.shared.heard() }
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         guard !Store.testing else { return }
         for url in urls where url.isFileURL || Links.takes(url) {

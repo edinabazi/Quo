@@ -340,7 +340,20 @@ if [ "$STEP" = "ship" ] && [ ! -f "Search.provisionprofile" ] && [ -z "${SEARCH_
   echo "ship: Search.provisionprofile is missing here (it's git-ignored: copy it from the main checkout)" >&2
   exit 1
 fi
-if [ -f "Search.provisionprofile" ]; then
+if [ -n "${SEARCH_PROFILE:-}" ] && [ -f "$SEARCH_PROFILE" ]; then
+  # A fork's own profile and entitlements (quo.sh: Quo.provisionprofile and
+  # Quo.entitlements, for iCloud sync). SEARCH_ICLOUD_ENV=Development signs
+  # for CloudKit's development environment, where a new record type can be
+  # made, before its schema is deployed to production.
+  cp "$SEARCH_PROFILE" "$APP/Contents/embedded.provisionprofile"
+  ENTITLEMENTS="${SEARCH_ENTITLEMENTS:-Search.entitlements}"
+  if [ -n "${SEARCH_ICLOUD_ENV:-}" ]; then
+    sed "s|<string>Production</string>|<string>$SEARCH_ICLOUD_ENV</string>|; s|<string>production</string>|<string>$(echo "$SEARCH_ICLOUD_ENV" | tr '[:upper:]' '[:lower:]')</string>|" \
+      "$ENTITLEMENTS" > "build/entitlements.plist"
+    ENTITLEMENTS="build/entitlements.plist"
+  fi
+  echo "profile embedded: $SEARCH_PROFILE (${SEARCH_ICLOUD_ENV:-Production})"
+elif [ -f "Search.provisionprofile" ]; then
   cp "Search.provisionprofile" "$APP/Contents/embedded.provisionprofile"
   ENTITLEMENTS="Search.passkeys.entitlements"
   echo "passkeys: profile embedded"

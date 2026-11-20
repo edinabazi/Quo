@@ -451,7 +451,10 @@ struct SettingsPanel: View {
             return mailHandler.map { "Email links from other apps go to \($0) now" } ?? item.detail
         case "downloads.folder":
             return prefs.downloads.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-        case "sync": return sync.on ? sync.summary : item.detail
+        case "sync":
+            if sync.on { return sync.summary }
+            // iCloud only where this build can reach it.
+            return SyncCloud.available ? item.detail : "Spaces, pins, bookmarks and settings, through a folder you choose"
         case "search.engine": return searchDetail
         case "search.shift": return shiftDetail
         case "search.suggest": return suggestDetail
@@ -543,8 +546,25 @@ struct SettingsPanel: View {
             // page as File › Bring Things Over… and the Welcome's.
             Pill("Bring Things Over…") { browser.lead(to: InternalPage(.importing)) }
         case "sync":
-            // On asks for the folder first; cancelled, it stays off.
-            Switch(on: Binding(get: { sync.on }, set: { $0 ? sync.choose() : sync.turnOff() }))
+            // Off, iCloud (in a build that can reach it), or a folder, which
+            // is asked for first; cancelled, it stays as it was.
+            HStack(spacing: 8) {
+                if sync.on { Pill("Sync Now") { sync.syncNow() } }
+            Picker("Sync", selection: Binding(get: { sync.way }, set: { way in
+                switch way {
+                case .off: sync.turnOff()
+                case .icloud: sync.turnOnCloud()
+                case .folder: sync.choose()
+                }
+            })) {
+                Text("Off").tag(Sync.Way.off)
+                if SyncCloud.available || sync.cloud { Text("iCloud").tag(Sync.Way.icloud) }
+                Text(sync.folder == nil ? "Folder…" : "Folder").tag(Sync.Way.folder)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            }
         case "quit.confirm": Switch(on: $prefs.confirmsQuit)
         case "downloads.folder": Pill("Change…") { chooseFolder() }
         case "downloads.ask": Switch(on: $prefs.asksWhereToSave)
@@ -752,6 +772,7 @@ struct SettingsPanel: View {
         case "profiles.oneWindow": Switch(on: $prefs.profilesInOneWindow)
         case "spaces.links": Switch(on: $prefs.sendsLinksToSpaces)
         case "pins.keep": Switch(on: $prefs.pinsKeepSite)
+        case "pins.links": Segmented(options: [(PinLinks.tab, "New tab"), (PinLinks.peek, "Peek")], selection: $prefs.pinLinks)
         case "pins.list": Switch(on: $prefs.listsPins)
         case "pins.folders": Switch(on: $prefs.pinFolders)
         case "pins.commandNewTab": Switch(on: $prefs.pinCommandOpensTab)

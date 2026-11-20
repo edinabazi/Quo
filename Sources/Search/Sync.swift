@@ -116,15 +116,24 @@ enum SyncSettings {
 final class Sync: ObservableObject {
     static let shared = Sync()
 
-    /// The folder chosen; nil while sync is off.
+    /// The folder chosen; nil unless syncing through a folder.
     @Published private(set) var folder: URL?
+    /// Syncing through iCloud instead (SyncCloud.swift).
+    @Published private(set) var cloud = false
     @Published private(set) var lastSynced: Date?
     /// Why the last pass couldn't run, for Settings.
     @Published private(set) var problem: String?
     /// The other Macs whose files were read, by name.
     @Published private(set) var others: [String] = []
 
-    var on: Bool { folder != nil }
+    var on: Bool { folder != nil || cloud }
+
+    /// Where it syncs, as Settings offers it.
+    enum Way: String, CaseIterable { case off, icloud, folder }
+    var way: Way { cloud ? .icloud : folder != nil ? .folder : .off }
+
+    nonisolated static let cloudKey = "sync.icloud"
+    private lazy var store = SyncCloud()
 
     nonisolated static let folderKey = "sync.folder"
     nonisolated static let deviceKey = "sync.device"
@@ -155,9 +164,45 @@ final class Sync: ObservableObject {
 
     /// At launch: carries on if it was on.
     func start() {
-        guard folder == nil, let path = Store.settings.string(forKey: Sync.folderKey), !path.isEmpty else { return }
+        guard !on else { return }
+        if Store.settings.bool(forKey: Sync.cloudKey), SyncCloud.available {
+            cloud = true
+            return begin()
+        }
+        guard let path = Store.settings.string(forKey: Sync.folderKey), !path.isEmpty else { return }
         folder = URL(fileURLWithPath: path, isDirectory: true)
         begin()
+    }
+
+    /// iCloud chosen: whatever this Mac did before is put down, and it joins
+    /// what is in iCloud as a Mac joining.
+    func turnOnCloud() {
+        guard SyncCloud.available else { return }
+        if on { turnOff() }
+        for scope in scopes { try? FileManager.default.removeItem(at: Sync.stateFile(scope)) }
+        store.forget()
+        Store.settings.set(true, forKey: Sync.cloudKey)
+        cloud = true
+        begin()
+    }
+
+    /// A silent push from the zone's subscription: another Mac wrote.
+    func heard() { schedule(after: 0.5) }
+
+    /// Settings › Sync Now.
+    func syncNow() {
+        guard on else { return }
+        pending?.cancel()
+        pending = nil
+        pass()
+    }
+
+    /// The next pass no sooner than iCloud asked for.
+    private func retry(after seconds: TimeInterval) {
+        let delay = max(2, seconds)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            MainActor.assumeIsolated { self?.schedule(after: 0) }
+        }
     }
 
     /// The switch turned on: a folder asked for, then the first pass.
@@ -176,6 +221,7 @@ final class Sync: ObservableObject {
     }
 
     func turnOn(_ url: URL) {
+        if cloud { turnOff() }
         stop()
         // Always as a Mac joining: what it agreed with another folder, or
         // with this one long ago, says nothing about what is there now.
@@ -194,10 +240,16 @@ final class Sync: ObservableObject {
                 try? FileManager.default.removeItem(at: root.appendingPathComponent(scope).appendingPathComponent(device + ".json"))
             }
         }
+        if cloud {
+            let store = self.store, device = self.device
+            Task { await store.removeOwn(device: device) }
+        }
         for scope in scopes { try? FileManager.default.removeItem(at: Sync.stateFile(scope)) }
         stop()
         Store.settings.removeObject(forKey: Sync.folderKey)
+        Store.settings.removeObject(forKey: Sync.cloudKey)
         folder = nil
+        cloud = false
         lastSynced = nil
         problem = nil
         others = []
@@ -209,6 +261,13 @@ final class Sync: ObservableObject {
             NotificationCenter.default.publisher(for: name).sink(receiveValue: poke).store(in: &bag)
         }
         Shared.prefs.objectWillChange.sink { [weak self] in self?.schedule() }.store(in: &bag)
+        // Signed out of iCloud, or into another Apple ID: looked at again.
+        if cloud {
+            NotificationCenter.default.publisher(for: .CKAccountChanged)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.schedule(after: 1) }
+                .store(in: &bag)
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pass() }
         }
@@ -265,6 +324,7 @@ final class Sync: ObservableObject {
     // MARK: - a pass
 
     func pass() {
+        if cloud { return cloudPass() }
         guard let folder, let root, !running else { return }
         pending?.cancel()
         pending = nil
@@ -305,9 +365,6 @@ final class Sync: ObservableObject {
         }
         problem = nil
         watch(folder, scope: scope)
-        let stateURL = Sync.stateFile(scope)
-        let state = (try? Data(contentsOf: stateURL)).flatMap { try? JSONDecoder().decode([String: SyncEntry].self, from: $0) }
-        let base = state ?? [:]
         let now = Date().timeIntervalSince1970
         var theirs: [[String: SyncEntry]] = []
         var names: [String] = []
@@ -334,17 +391,7 @@ final class Sync: ObservableObject {
             names.append(file.name ?? "Another Mac")
         }
 
-        // A Mac joining a folder other Macs already use takes what they
-        // agreed where both have something; the first Mac there sets it.
-        let here = current(SyncMerge.live(base))
-        let merged = SyncMerge.pass(current: here, base: state, theirs: theirs, device: device, now: now,
-                                    understood: SyncItems.understood)
-        let live = SyncMerge.live(merged)
-        if live != here { apply(live) }
-        if merged != base, let data = try? JSONEncoder().encode(merged) {
-            try? files.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: stateURL, options: .atomic)
-        }
+        let merged = merge(scope: scope, theirs: theirs, now: now, current: current, apply: apply)
         // This Mac's file, only when it says something new.
         let written = (try? Data(contentsOf: own)).flatMap { SyncMerge.decode($0, scope: scope) }
         if written?.items != merged || written?.name != Sync.macName {
@@ -352,6 +399,79 @@ final class Sync: ObservableObject {
             if let data = SyncMerge.encode(file) { try? data.write(to: own, options: .atomic) }
         }
         return names
+    }
+
+    /// One scope's items merged with the other Macs', applied here, and what
+    /// this Mac agreed kept: the same for the folder and for iCloud. A Mac
+    /// joining takes what the others agreed where both have something; the
+    /// first Mac there sets it.
+    private func merge(scope: String, theirs: [[String: SyncEntry]], now: Double,
+                       current: ([String: String]) -> [String: String],
+                       apply: ([String: String]) -> Void) -> [String: SyncEntry] {
+        let stateURL = Sync.stateFile(scope)
+        let state = (try? Data(contentsOf: stateURL)).flatMap { try? JSONDecoder().decode([String: SyncEntry].self, from: $0) }
+        let base = state ?? [:]
+        let here = current(SyncMerge.live(base))
+        let merged = SyncMerge.pass(current: here, base: state, theirs: theirs, device: device, now: now,
+                                    understood: SyncItems.understood)
+        let live = SyncMerge.live(merged)
+        if live != here { apply(live) }
+        if merged != base, let data = try? JSONEncoder().encode(merged) {
+            try? FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: stateURL, options: .atomic)
+        }
+        return merged
+    }
+
+    /// A pass through iCloud: what changed fetched, each scope merged as the
+    /// folder's are, and this Mac's record saved where it says something new.
+    private func cloudPass() {
+        guard cloud, !running else { return }
+        pending?.cancel()
+        pending = nil
+        running = true
+        let store = self.store
+        Task { @MainActor in
+            defer { running = false }
+            do {
+                // Another Apple ID than last time: what this Mac agreed with
+                // the old one is forgotten, and it joins the new one's as a
+                // Mac joining, never pouring one account into the other.
+                if try await store.prepare() {
+                    for scope in scopes { try? FileManager.default.removeItem(at: Sync.stateFile(scope)) }
+                }
+                try await store.fetchChanges()
+            } catch {
+                problem = SyncCloud.describe(error)
+                // iCloud asked for a pause: the next pass waits for it.
+                if let wait = SyncCloud.retryAfter(error) { retry(after: wait) }
+                return
+            }
+            problem = nil
+            let prefs = Shared.prefs
+            var work: [(String, ([String: String]) -> [String: String], ([String: String]) -> Void)] = [
+                ("app", { _ in SyncSettings.items(prefs) }, { SyncSettings.apply($0, to: prefs) }),
+            ]
+            for profile in Profiles.shared.list {
+                work.append((Sync.scope(profile.id), { Sync.items(of: profile.id, base: $0) }, { Sync.apply($0, to: profile) }))
+            }
+            var seen = Set<String>()
+            let now = Date().timeIntervalSince1970
+            for (scope, current, apply) in work {
+                let theirs = store.files(in: scope).filter { $0.device != device }
+                seen.formUnion(theirs.map { $0.name ?? "Another Mac" })
+                let merged = merge(scope: scope, theirs: theirs.map(\.items), now: now, current: current, apply: apply)
+                let own = store.file(scope: scope, device: device)
+                guard own?.items != merged || own?.name != Sync.macName else { continue }
+                let file = SyncFile(format: SyncMerge.format, device: device, name: Sync.macName, scope: scope, written: now, items: merged)
+                do { try await store.save(file) } catch {
+                    problem = SyncCloud.describe(error)
+                    if let wait = SyncCloud.retryAfter(error) { retry(after: wait) }
+                }
+            }
+            others = seen.sorted()
+            if problem == nil { lastSynced = Date() }
+        }
     }
 
     /// A file of another Mac arriving or changing: a pass soon.
@@ -426,6 +546,13 @@ final class Sync: ObservableObject {
 
     /// Where, and when last, in a line.
     var summary: String {
+        if cloud {
+            if let problem { return "iCloud: \(problem.lowercased())" }
+            guard let lastSynced else { return "iCloud" }
+            let when = RelativeDateTimeFormatter().localizedString(for: lastSynced, relativeTo: Date())
+            let with = others.isEmpty ? "no other Mac yet" : others.joined(separator: ", ")
+            return "iCloud · \(with) · \(when)"
+        }
         guard let folder else { return "" }
         var place = folder.path
         let drive = NSHomeDirectory() + "/Library/Mobile Documents/com~apple~CloudDocs"

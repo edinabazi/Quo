@@ -7798,7 +7798,15 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
            action.modifierFlags.intersection([.shift, .command, .option, .control]).isEmpty,
            let from = tab(for: webView), peeksFromPin(url, in: from, on: webView.backForwardList.currentItem?.url) {
             decisionHandler(.cancel)
-            DispatchQueue.main.async { [weak self] in self?.peek(url, from: from) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard prefs.pinLinks == .tab else { return peek(url, from: from) }
+                // A new tab beside the pin, gone to, as Dia has it. Marked
+                // as followed, so the pin's own script going after it too
+                // (Google's results do) is let go, as after a peek.
+                if let host = url.host()?.lowercased() { from.peeked = (Vault.registrable(host), Date()) }
+                open(url, foreground: true, from: from, link: true, loose: true)
+            }
             return
         }
         if action.navigationType == .other, action.targetFrame?.isMainFrame == true,
@@ -8049,7 +8057,8 @@ extension Browser: WKNavigationDelegate, WKUIDelegate {
         // pop-ups, takes the tab path as before. A window sized by the page,
         // "Sign in with…", is left alone, as is a modified click, and so is
         // anything that isn't a web page (about:blank, data:, blob:).
-        if clicked, !behind, !beside, !popup, prefs.pinsPeek, !peekInFront, opener.pin != nil,
+        // With pins' links set to open in a tab, it takes the tab path.
+        if clicked, !behind, !beside, !popup, prefs.pinsPeek, prefs.pinLinks == .peek, !peekInFront, opener.pin != nil,
            [.linkActivated, .other].contains(action.navigationType),
            action.modifierFlags.intersection([.shift, .command, .option, .control]).isEmpty,
            let url = action.request.url, Browser.peekable(url) {

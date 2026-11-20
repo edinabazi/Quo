@@ -45,7 +45,11 @@ def peek(): return sv.cmd({"do": "probe"})["peek"]
 def close(): sv.cmd({"do": "peek", "url": "close"}); time.sleep(0.5)
 
 try:
-    sv.setup(sidebar=True, **{"pins.peek": True, "pins.list": True}); sv.launch()
+    sv.setup(sidebar=True, **{"pins.peek": True, "pins.list": True})
+    # Links to other sites open in a peek here (a new tab is the default:
+    # Tests/pin_links_tab.py).
+    subprocess.run(["defaults", "write", sv.SUITE, "pins.links", "-string", "peek"])
+    sv.launch()
     a = sv.page("home"); pin(a); sv.sp("select", id=a); time.sleep(0.5)
 
     follow(a, f"{OTHER}/out")

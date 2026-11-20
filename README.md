@@ -50,7 +50,7 @@ This is [driceroland/Search#738](https://github.com/driceroland/Search/pull/738)
 
 ### Pins keep their site
 
-An address for another site typed into a pinned tab, in its row, the address bar or ⌘L, opens in a new tab beside it, and the pin stays where it was, as in Arc and Dia. A page of the pin's own site still loads in the pin.
+A link in a pinned tab that leads to another site, or another site's address typed into it (in its row, the address bar or ⌘L), opens in a new tab beside it, and the pin stays where it was, as in Dia. Search opens such links in a Peek over the pin instead; that is still a choice in **Settings › Spaces & Pins › Links to other sites open in**. A page of the pin's own site still loads in the pin.
 
 ### Chrome's reload keys
 
@@ -91,13 +91,24 @@ Everything the app says about itself reads `Store.name`, so it says Quo here and
 
 It signs with the first Developer ID certificate in your keychain, or ad hoc if there is none (then the first launch needs right-click › Open).
 
-For quick checks while working, `swift build` compiles, `swift test` runs the unit tests, and `SEARCH_DEV=1 ./build.sh` makes a yellow-icon dev build of Search. To try a dev build without touching anyone's data, open it in a test profile of its own:
+For quick checks while working, `swift build` compiles, `swift test --parallel` runs the unit tests in about a minute (one after another, `swift test` takes over twelve), and `SEARCH_DEV=1 ./build.sh` makes a yellow-icon dev build of Search. To try a dev build without touching anyone's data, open it in a test profile of its own:
 
 ```bash
 open -n --env SEARCH_PROBE=mytest build/Search.app
 ```
 
 Test profiles turn a few things off on purpose (links from other apps, mailto:, file pickers), so they're for checking, not for daily use.
+
+### Sync through iCloud
+
+Settings › General › Sync can go through iCloud: each Mac's spaces, pins, bookmarks and settings are a record in the person's own private iCloud, in CloudKit's encrypted fields, with no account or server of ours (`SyncCloud.swift`). It needs a build signed for an iCloud container, set up once in the Apple Developer account:
+
+1. **Identifiers › iCloud Containers**: `iCloud.com.edinabazi.quo`.
+2. **Identifiers › App IDs**: `com.edinabazi.quo`, with iCloud (CloudKit, that container) and Push Notifications.
+3. **Profiles › Developer ID**: for that App ID, saved here as `Quo.provisionprofile` (git-ignored). `quo.sh` then embeds it with `Quo.entitlements`.
+4. The first time only: `SEARCH_ICLOUD_ENV=Development ./quo.sh install`, turn sync to iCloud so the record type is made, then **Deploy Schema Changes** to Production in the CloudKit Console, and build normally.
+
+Without the profile, Quo builds as before and offers only the folder. `Tests/sync_icloud.py` plays two Macs against a folder standing in for iCloud.
 
 ### Moving your Search data into Quo
 

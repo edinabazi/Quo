@@ -24,6 +24,12 @@ enum Glyph: String, CaseIterable, Identifiable {
 }
 
 /// Peek uses modified left clicks, leaving plain clicks and Control-click alone.
+/// Where a pin's link to another site opens, with Pins keep their site on:
+/// a new tab beside it, as Dia does, or a peek over it, as Arc does.
+enum PinLinks: String, CaseIterable {
+    case tab, peek
+}
+
 enum PeekClick: String, CaseIterable {
     case shift, optionShift, optionCommand
 
@@ -654,6 +660,10 @@ final class Preferences: ObservableObject {
     @Published var peekClick: PeekClick {
         didSet { store.set(peekClick.rawValue, forKey: "links.peekClick") }
     }
+    /// Settings › Spaces & Pins › Links to other sites open in.
+    @Published var pinLinks: PinLinks {
+        didSet { store.set(pinLinks.rawValue, forKey: "pins.links") }
+    }
     /// Open a clicked link over the page (see Peek.swift). On unless turned off.
     @Published var peeksLinks: Bool {
         didSet { store.set(peeksLinks, forKey: "links.peek") }
@@ -1199,6 +1209,7 @@ final class Preferences: ObservableObject {
         installsUpdates = store.object(forKey: Updater.installKey) as? Bool ?? true
         peeksLinks = store.object(forKey: "links.peek") as? Bool ?? true
         peekClick = store.string(forKey: "links.peekClick").flatMap(PeekClick.init(rawValue:)) ?? .shift
+        pinLinks = store.string(forKey: "pins.links").flatMap(PinLinks.init(rawValue:)) ?? .tab
         peekStays = store.bool(forKey: "links.peek.stays")
         optionClickSplits = store.bool(forKey: "links.optionSplit")
         pinsPeek = keepsSite

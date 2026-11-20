@@ -28,6 +28,9 @@ final class ExtensionLoadRaceTests: XCTestCase {
 
     func testSwitchedOffWhileLoadingStaysOffAndOnlyNewestLoadLands() async throws {
         _ = NSApplication.shared
+        // A window first, as the app has one: the first starts extensions
+        // loading. Run alone, or first in its process, the test had none.
+        _ = Browser(record: WindowRecord())
         let extensions = Extensions.shared
         let source = FileManager.default.temporaryDirectory.appendingPathComponent("load-race-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)

@@ -149,6 +149,13 @@ final class PinDragTests: XCTestCase {
     }
 
     func testPinDraggedAmongTheRowsBecomesATabThere() async throws {
+        // These two fail on Search's own code too, on macOS 27 and later:
+        // the drop of a drag posted to an off-screen window lands short of
+        // where it does by hand. Still run, and no longer expected to fail
+        // the day they pass.
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27 {
+            XCTExpectFailure("A synthetic drag's drop lands elsewhere on macOS 27, in Search too", options: .nonStrict())
+        }
         let browser = makeBrowser(count: 5)
         let t = browser.tabs
         browser.pin(t[0]); browser.pin(t[1])
@@ -169,6 +176,13 @@ final class PinDragTests: XCTestCase {
     }
 
     func testDropsWhileTheRowsScroll() async throws {
+        // These two fail on Search's own code too, on macOS 27 and later:
+        // the drop of a drag posted to an off-screen window lands short of
+        // where it does by hand. Still run, and no longer expected to fail
+        // the day they pass.
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27 {
+            XCTExpectFailure("A synthetic drag's drop lands elsewhere on macOS 27, in Search too", options: .nonStrict())
+        }
         // More rows than the window holds: they scroll, under the grid.
         let browser = makeBrowser(count: 20)
         let t = browser.tabs

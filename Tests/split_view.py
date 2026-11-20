@@ -150,10 +150,12 @@ def setup(**prefs):
     time.sleep(1); wipe()
     for k in ["bench", "welcomed"]: subprocess.run(["defaults", "write", SUITE, k, "-bool", "true"])
     for k, v in prefs.items(): subprocess.run(["defaults", "write", SUITE, k, "-bool", "true" if v else "false"])
-def launch():
+def launch(env=None):
+    """`env`: more variables for the app, as {name: value}."""
     if os.path.exists(SOCK): os.remove(SOCK)
     before = running()
-    subprocess.run(["open", "-n", "-g", "-j", "--env", f"SEARCH_PROBE={W}", APP])
+    extra = [a for k, v in (env or {}).items() for a in ("--env", f"{k}={v}")]
+    subprocess.run(["open", "-n", "-g", "-j", "--env", f"SEARCH_PROBE={W}", *extra, APP])
     for _ in range(150):
         if os.path.exists(SOCK): break
         time.sleep(0.1)

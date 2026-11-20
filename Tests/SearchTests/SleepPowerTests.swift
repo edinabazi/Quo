@@ -8,6 +8,14 @@ final class SleepPowerTests: XCTestCase {
     private let keys = [Motion.lightKey, SleepPace.key, "sleep.after"]
     private var saved: [String: Any?] = [:]
 
+    /// A world of its own: run in parallel, each test is a process of its
+    /// own, and in the shared test world one's "sleep.after" of 42 reached
+    /// another's at the same moment.
+    override class func setUp() {
+        setenv("SEARCH_PROBE", "sleep-power-\(getpid())", 1)
+        super.setUp()
+    }
+
     override func setUp() {
         super.setUp()
         for key in keys {

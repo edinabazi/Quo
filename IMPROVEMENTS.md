@@ -4,6 +4,7 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Looks and feel
 
+- **An onboarding to match Arc's and Dia's**: six full-window steps on a slowly moving gradient, with frosted cards that rise in. Pick the look, where the tabs go, Roomy or Compact and a colour, with a live preview; bring Arc's spaces or another browser's things over; set up sync, the blocker and its lists, and the default browser; and finish on the six keys worth knowing. Search had four plain pages. *Nov 2026*
 - **Roomy or Compact** (Settings › Appearance › Size), Roomy by default. Taller tabs and rows and larger text in the column, a larger address bar and ⌘T field, and more room in Settings, every built-in page (History, Downloads, Bookmarks, Passwords, Archived Tabs), the small window for links and website pop-ups. Pin squares are taller, as Arc's are. *Nov 2026*
 - **The window's buttons stay on the left with the column on the right**, in a row across the top: the address bar, or with it off, a slim row with back, forward and reload. Search moved them into the column's far corner. *Nov 2026*
 - **The address field takes a space's colour** instead of sitting on it as a grey slab. *Nov 2026*
@@ -15,7 +16,7 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 - **Downloads as cards in the column**, as in Arc: progress and time left while they come in, then the file itself, to open, show in Finder or drag out to another app. Search had a small ring in the column's foot. *Nov 2026*
 - **Arc's habits on from the start**: spaces, ⌘T's floating field with recent places and commands, pinned rows and folders in them. Search has them all but starts with them off. *Nov 2026*
-- **A pin keeps its site when you type another one into it**: it opens in a new tab, as in Arc and Dia. *Nov 2026*
+- **A pin keeps its site, and what leaves it opens in a new tab**: a link in a pin to another site, or another site's address typed into it, opens a new tab beside it, as Dia does, and the pin stays where it was. Search opened such links in a Peek over the pin, which is still a choice (Settings › Spaces & Pins). *Nov 2026*
 - **Chrome's reload keys**: ⇧⌘R reloads skipping the cache, and Reading Mode moves to ⌥⌘R. *Nov 2026*
 
 ## Blocking
