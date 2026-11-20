@@ -1256,7 +1256,8 @@ enum Mozilla {
             bookmarks: Bookmarks.count(bookmarks(in: source, profile: profile)),
             places: min(limit, places),
             passwords: passwords,
-            addons: addons(in: source, profile: profile)
+            addons: addons(in: source, profile: profile),
+            session: sessions(in: source, profile: profile)
         )
     }
 
@@ -1646,7 +1647,7 @@ enum ImportSource: Identifiable, Hashable {
         var extensions: [String] { addons.filter(\.comes).map(\.id) }
         /// The ones that can't, the browser's own left out.
         var leftBehind: [Addon] { addons.filter { !$0.comes && !$0.builtIn } }
-        /// The open tabs and tab groups, for a Chromium browser: read here,
+        /// The open tabs and tab groups, for a Chromium or Gecko browser: read here,
         /// off the main thread, and brought in from this as it is.
         var session = SessionImport.Snapshot()
     }

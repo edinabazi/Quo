@@ -1963,6 +1963,15 @@ final class Bench {
                     out["arc"] = "no Arc sidebar"
                 }
             }
+            if what.contains("tabs") {
+                // Its open tabs and groups, read as the sheet counts them,
+                // then brought in as Bring them in does.
+                let session = source.preview(profile: profile).session
+                let got = browser.takeSession(session, from: source, profile: profile)
+                out["tabs"] = ["found": session.found, "read": session.tabs, "groups": session.groups.count,
+                               "added": got.tabs, "pins": got.pins, "newGroups": got.groups,
+                               "groupNames": browser.tabGroups.map(\.name)]
+            }
             // What is now recorded from it, as the sheet shows it.
             func finish() {
                 if let record = ImportRecords.of(source.name) {

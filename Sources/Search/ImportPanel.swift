@@ -37,7 +37,7 @@ struct ImportPanel: View {
     /// Safari's extensions, which can't come: named so one like each can be
     /// found (see safariAddons).
     @State private var safariAddons: [ImportSource.Addon] = []
-    /// A Chromium browser's open tabs and tab groups (see takeSession).
+    /// A browser's open tabs and tab groups (see takeSession).
     /// Off unless asked for.
     @State private var wantsTabs = false
     /// What came from this browser before goes, and its bookmarks come
@@ -215,6 +215,9 @@ struct ImportPanel: View {
         let tabs = session.found > session.tabs
             ? "The first \(session.tabs.formatted()) of \(session.found.formatted()) tabs" : count(session.tabs, "tab")
         let groups = session.groups.isEmpty ? "" : " in \(count(session.groups.count, "group"))"
+        if case .mozilla(let mozilla) = source, mozilla.keepsSpaces {
+            return "\(tabs)\(groups) — asleep at the end of this space; its pinned tabs come with its spaces"
+        }
         return "\(tabs)\(groups) — asleep at the end of this space, pinned tabs as pins"
     }
 
@@ -355,11 +358,9 @@ struct ImportPanel: View {
                 option($wantsHistory, none: preview?.places == 0)
             }
             // Its open tabs and tab groups, asleep at the end of this space.
-            if case .chromium = source {
-                Rule()
-                Line("Open tabs & tab groups", tabsDetail(preview, source)) {
-                    option($wantsTabs, none: !bringsTabs(source))
-                }
+            Rule()
+            Line("Open tabs & tab groups", tabsDetail(preview, source)) {
+                option($wantsTabs, none: !bringsTabs(source))
             }
             // Arc's own, or Zen's: its spaces, what is pinned in them, its
             // favourites or Essentials.
