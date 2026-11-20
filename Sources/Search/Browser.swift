@@ -2305,6 +2305,16 @@ final class Browser: NSObject, ObservableObject {
     var bareRow: Bool { lightsInAddressBar && !prefs.addressBar }
     /// Back, forward and reload are in a row across the top, not the column.
     var doorsInRow: Bool { addressBarUp || bareRow }
+    /// The band at the column's top, and the bar the window's buttons are
+    /// centred in: with the address bar beside the column, the bar's own
+    /// height, so the pins (or the first row, with none) start where the
+    /// page's card does and the buttons sit on the field's line; otherwise
+    /// the strip's. From the settings alone, so folding the column away and
+    /// back doesn't move the buttons.
+    var topBand: CGFloat {
+        let barBeside = prefs.addressBar && prefs.sidebar && !prefs.iconColumn
+        return lightsInAddressBar || barBeside ? AddressBar.height(prefs) : Metrics.strip
+    }
 
     func beginTabEdit(_ tab: Tab) {
         // The column of icons has no row to type in: the field over the
@@ -7030,7 +7040,7 @@ final class Browser: NSObject, ObservableObject {
         }
 
         guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else {
-            offers = launching && prefs.recentInNewTab ? recentPlaces() : []
+            offers = launching ? launchOffers() : []
             ending = nil
             picked = nil
             siteOffer = nil
@@ -7043,6 +7053,22 @@ final class Browser: NSObject, ObservableObject {
         if siteOffer != site { siteOffer = site }
 
         (offers, ending) = placeOffers(for: typed)
+        // ⌘T's field, as Arc's: the open tabs that answer to what is typed
+        // first, to switch to with ↓ and Return, and the menus' commands and
+        // Settings' pages under the rest even with Address bar commands off.
+        // Return still does what it did: open what was typed in a new tab.
+        if launching {
+            let open = openPages(matching: typed).filter { offer in
+                guard let id = offer.tab, let tab = tabs.first(where: { $0.id == id }) else { return false }
+                return !tab.bench && tab.shy == (active?.shy ?? false)
+            }
+            let shown = Set(open.map(\.url))
+            offers = open + offers.filter { $0.tab != nil || !shown.contains($0.url) }
+            if !prefs.commandBar, !offers.isEmpty {
+                let near = AddressCommand.near(typed, in: self).map { [Suggestion.command($0)] } ?? []
+                offers += near + AddressCommand.listed(typed, in: self).map(Suggestion.command)
+            }
+        }
         // The empty page of a pair is there to bring a page in, and its list
         // of open tabs goes once typing starts (SplitView's OpenTabs): the
         // open tabs that answer to what is typed come first, as in ⌘K, so
@@ -7286,6 +7312,18 @@ final class Browser: NSObject, ObservableObject {
     /// nothing asked of anybody, and nothing from a private tab, which keeps
     /// no history to offer. Nothing is chosen until an arrow key chooses it:
     /// Return on an empty field still opens nothing.
+    /// ⌘T's field before anything is typed, as Arc's: the tabs you were
+    /// last in, to switch to, then the last places you went when Settings
+    /// says so. Nothing is picked until an arrow key picks it.
+    private func launchOffers() -> [Suggestion] {
+        let shy = active?.shy ?? false
+        let open = openPages(matching: "").filter { offer in
+            guard let id = offer.tab, let tab = tabs.first(where: { $0.id == id }) else { return false }
+            return !tab.bench && tab.shy == shy
+        }
+        return Array(open.prefix(4)) + (prefs.recentInNewTab ? recentPlaces() : [])
+    }
+
     private func recentPlaces() -> [Suggestion] {
         guard active?.shy != true else { return [] }
         let open = Set(tabs.compactMap { $0.address.map(History.identity(for:)) })
@@ -7537,6 +7575,19 @@ final class Browser: NSObject, ObservableObject {
         if let page = InternalPage(url: url) {
             show(page)
             picked = nil
+            return
+        }
+        // ⌘T's field going to a page that's already open in a tab, as Arc's:
+        // that tab, not a second copy of the page.
+        let shy = active?.shy ?? false
+        if launching, !aside, url.scheme == "http" || url.scheme == "https",
+           let tab = tabs.first(where: { tab in
+               !tab.bench && tab.shy == shy
+                   && tab.address.map { History.identity(for: $0) == History.identity(for: url) } == true
+           }) {
+            select(tab)
+            editing = false
+            typed = ""
             return
         }
         if launching || fromSwitcher, !aside {

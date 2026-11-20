@@ -62,6 +62,9 @@ struct Omnibox: View {
 
     @State private var shake: CGFloat = 0
     @State private var refused = false
+    /// The list's travelling grounds (Row), and the row under the pointer.
+    @Namespace private var rowGround
+    @State private var hoveredRow: String?
 
     /// An empty tab's field, alone in its window or pane: the space's home
     /// is around it (`homed`, from whoever puts the field up).
@@ -226,7 +229,10 @@ struct Omnibox: View {
                     .onTapGesture { _ = browser.lockSiteOffer() }
             }
             ForEach(Array(browser.offers.enumerated()), id: \.element.id) { index, offer in
-                Row(offer: offer, picked: browser.picked == index)
+                // Among places to go, an open tab says it's one; in ⌘K's
+                // list, where every row is, it needn't.
+                Row(offer: offer, picked: browser.picked == index, switches: offer.kind == .open && !browser.summoning,
+                    ground: rowGround, hovered: $hoveredRow)
                     .contentShape(Rectangle())
                     .onTapGesture { browser.take(offer) }
             }
@@ -246,6 +252,8 @@ struct Omnibox: View {
                 .strokeBorder(Palette.hairline, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.07), radius: 20, y: 6)
+        // The arrow keys' ground glides to its row, as the pointer's does.
+        .animation(Motion.glide, value: browser.picked)
         .transition(.scale(scale: 0.98, anchor: .top).combined(with: .opacity))
     }
 
@@ -255,9 +263,19 @@ struct Omnibox: View {
         /// Where the arrow keys have walked to. The pointer gets its own,
         /// quieter mark, and changes nothing but the look of the row.
         let picked: Bool
+        /// An open tab among places to load: "Switch to Tab" at its end.
+        var switches = false
+        /// The list's one hover ground, which travels from row to row as the
+        /// tab column's does, and the row it is under. Without them, each
+        /// row lights up on its own.
+        var ground: Namespace.ID? = nil
+        var hovered: Binding<String?>? = nil
 
         @Environment(\.fieldMeasures) private var m
         @State private var hovering = false
+
+        /// Under the pointer, by the list's reckoning when it keeps one.
+        private var lit: Bool { hovered.map { $0.wrappedValue == offer.id } ?? hovering }
 
         var body: some View {
             HStack(spacing: m.roomy ? 12 : 10) {
@@ -313,6 +331,19 @@ struct Omnibox: View {
                         .font(.system(size: m.rowNote))
                         .foregroundStyle(Palette.muted)
                 }
+                if switches {
+                    HStack(spacing: 8) {
+                        Text("Switch to Tab")
+                            .font(.system(size: m.rowNote, weight: .medium))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: m.glyph - 1, weight: .semibold))
+                            .frame(width: m.icon + 4, height: m.icon + 4)
+                            .background(Palette.ink.opacity(picked || lit ? 0.12 : 0.06),
+                                        in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                    .foregroundStyle(picked || lit ? Palette.ink : Palette.muted)
+                    .fixedSize()
+                }
                 if offer.kind == .bookmark {
                     // Kept by you, not only visited: the bookmark's mark,
                     // at the end now that the site's icon leads the row.
@@ -323,15 +354,32 @@ struct Omnibox: View {
             .padding(.vertical, m.rowAir)
             .background {
                 if picked {
-                    RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous)
-                        .fill(Palette.wash)
-                } else if hovering {
-                    RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous)
-                        .fill(Palette.hover)
+                    travelling(RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous).fill(Palette.wash), "picked")
+                } else if lit {
+                    travelling(RoundedRectangle(cornerRadius: m.rowCorner, style: .continuous).fill(Palette.hover), "hover")
                 }
             }
-            .onHover { hovering = $0 }
+            .onHover { on in
+                guard let hovered else { return hovering = on }
+                let id = offer.id
+                if on {
+                    withAnimation(Motion.glide) { hovered.wrappedValue = id }
+                } else {
+                    // Leaving for the next row: that row takes the ground
+                    // before this lets go, so it travels rather than
+                    // fading out and in (as SpaceHome's rows).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                        guard hovered.wrappedValue == id else { return }
+                        withAnimation(Motion.quick) { hovered.wrappedValue = nil }
+                    }
+                }
+            }
             .animation(Motion.quick, value: hovering)
+        }
+
+        @ViewBuilder
+        private func travelling<V: View>(_ shape: V, _ id: String) -> some View {
+            if let ground { shape.matchedGeometryEffect(id: id, in: ground) } else { shape }
         }
 
         private func symbol(_ name: String) -> some View {

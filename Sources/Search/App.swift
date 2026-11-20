@@ -970,6 +970,10 @@ struct ContentView: View {
             .onChange(of: browser.prefs.roomyTabs) { _, _ in
                 DispatchQueue.main.async { Lights.refresh(window); measureLights() }
             }
+            // With the address bar beside the column, they sit on its line.
+            .onChange(of: browser.prefs.addressBar) { _, _ in
+                DispatchQueue.main.async { Lights.refresh(window); measureLights() }
+            }
             .onChange(of: browser.prefs.iconColumn) { _, _ in
                 DispatchQueue.main.async { Lights.refresh(window); measureLights() }
             }
@@ -1266,7 +1270,7 @@ struct ContentView: View {
                 ? window.frame.width - (edges.side ?? browser.prefs.columnWidth) + Lights.centre.x
                 : Lights.centre.x
         }, vertical: { _ in browser.prefs.iconColumn && !browser.lightsInAddressBar },
-           height: { _ in browser.lightsInAddressBar ? AddressBar.height(browser.prefs) : Metrics.strip }) { measureLights() }
+           height: { _ in browser.topBand }) { measureLights() }
         DispatchQueue.main.async { measureLights() }
 
         // The traffic lights are drawn — measured, they paint themselves — but

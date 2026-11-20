@@ -480,6 +480,9 @@ private final class LauncherPanel: NSPanel {
 /// The field and its list, as they are over a page, standing over another
 /// app instead.
 private struct LauncherView: View {
+    /// The list's travelling grounds (Omnibox.Row), and the row under the pointer.
+    @Namespace private var rowGround
+    @State private var hoveredRow: String?
     /// Room around the field for its shadow, which the panel doesn't draw.
     static let margin: CGFloat = 32
 
@@ -528,11 +531,12 @@ private struct LauncherView: View {
     private var list: some View {
         VStack(spacing: 0) {
             ForEach(Array(launcher.offers.enumerated()), id: \.element.id) { index, offer in
-                Omnibox.Row(offer: offer, picked: launcher.picked == index)
+                Omnibox.Row(offer: offer, picked: launcher.picked == index, ground: rowGround, hovered: $hoveredRow)
                     .contentShape(Rectangle())
                     .onTapGesture { launcher.take(offer) }
             }
         }
+        .animation(Motion.glide, value: launcher.picked)
         .padding(6)
         .background(Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(

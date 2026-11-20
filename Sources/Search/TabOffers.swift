@@ -128,15 +128,19 @@ enum TabOffersPanel {
 /// The list itself, drawn as ⌘L's is.
 private struct TabOffersList: View {
     @ObservedObject var browser: Browser
+    /// The list's travelling grounds (Omnibox.Row), and the row under the pointer.
+    @Namespace private var rowGround
+    @State private var hoveredRow: String?
 
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(browser.tabOffers.enumerated()), id: \.element.id) { index, offer in
-                Omnibox.Row(offer: offer, picked: browser.tabPicked == index)
+                Omnibox.Row(offer: offer, picked: browser.tabPicked == index, ground: rowGround, hovered: $hoveredRow)
                     .contentShape(Rectangle())
                     .onTapGesture { browser.takeTabOffer(offer) }
             }
         }
+        .animation(Motion.glide, value: browser.tabPicked)
         .padding(m.listAir)
         .background(Palette.ground, in: RoundedRectangle(cornerRadius: m.corner, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: m.corner, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))

@@ -94,9 +94,9 @@ struct SideBar: View {
     private var lightsBand: CGFloat {
         browser.lightsInAddressBar ? AddressBar.height(prefs) : browser.fullScreen ? 8 : Metrics.iconLights
     }
-    /// The band over the pins: the strip's height, or, under the address
-    /// bar running over the column (lightsInAddressBar), the bar's.
-    private var band: CGFloat { browser.lightsInAddressBar ? AddressBar.height(prefs) : Metrics.strip }
+    /// The band over the pins: the strip's height, or, with the address bar
+    /// beside the column or over it, the bar's (Browser.topBand).
+    private var band: CGFloat { browser.topBand }
     /// What sits above the pins: the lights' band, and with icons only the
     /// three doors under it.
     private var top: CGFloat { icons ? lightsBand + Metrics.helmDoors + 8 : band }
