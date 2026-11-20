@@ -352,6 +352,7 @@ struct SideBar: View {
                     Spacer(minLength: 0)
                 }
                 .frame(maxHeight: .infinity)
+                .transition(SpaceCard.card)
             } else if browser.spaces[index].id == browser.spaceID {
                 VStack(alignment: .leading, spacing: 0) {
                     if !browser.squarePins.isEmpty || ghostSquare != nil {
@@ -455,6 +456,9 @@ struct SideBar: View {
                 // from one to another (see PinDrop).
                 .coordinateSpace(name: "column")
                 .animation(Motion.settle, value: crossing)
+                // Giving way to the new space's card and coming back
+                // (SpaceCard); a swipe or ⌃1–9 changes the page without it.
+                .transition(SpaceCard.page)
             } else {
                 preview(browser.parked[browser.spaces[index].id] ?? Parked(tabs: [], active: nil),
                         space: browser.spaces[index].id, pill: pill)
@@ -1208,7 +1212,8 @@ struct SideBar: View {
     /// The foot's door and its margin beneath; with icons only, its doors
     /// one above the other.
     private var footHeight: CGFloat {
-        icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging, puzzle: !browser.addressBarUp)) * 28 + 8 : 26 + 10
+        icons ? CGFloat(SideFoot.doors(prefs, browser.fetches, hanging: browser.downloadsHanging, puzzle: !browser.addressBarUp)) * 28 + 8
+            : SideFoot.door(prefs) + 10
     }
     /// Between what plays in another tab and the foot's doors.
     private static let playerGap: CGFloat = 4
@@ -1244,7 +1249,7 @@ struct SideBar: View {
 /// overflow off each side (#535). The space's door, the puzzle, bookmarks and
 /// downloads stay put; the pinned extensions that don't fit give way, from
 /// the last, and are still in the puzzle's list.
-private struct SideFoot: View {
+struct SideFoot: View {
     @ObservedObject var browser: Browser
     @ObservedObject var prefs: Preferences
     @ObservedObject var fetches: Fetches
@@ -1270,23 +1275,60 @@ private struct SideFoot: View {
             .frame(maxWidth: .infinity)
             .padding(.bottom, 8)
         } else {
+            // As Arc's: the doors at the left, every space across the
+            // middle, the one you're in lit, and + for another at the right.
+            // With more spaces than fit, the one space's door, as before.
             HStack(spacing: 2) {
                 if Profiles.shared.several { ProfileBadge(browser: browser) }
-                if prefs.usesSpaces { SpaceDot(browser: browser) }
+                if prefs.usesSpaces, !spacesInRow { SpaceDot(browser: browser) }
                 // At the address bar's far end while it is up.
                 if !browser.addressBarUp {
-                    ExtensionSlot(browser: browser, edge: .trailing, room: room)
+                    ExtensionSlot(browser: browser, edge: .trailing, room: room, side: side)
                 }
-                BookmarkDoor(browser: browser, arrowEdge: .trailing)
+                // Up from the foot, the arrow under it straight down to the
+                // button: opened out to the side, the arrow fell at the
+                // popover's corner and bent.
+                BookmarkDoor(browser: browser, arrowEdge: .top, floats: true)
                 // Only while a download is running, and a moment after; the
                 // cards over the foot show how it is going.
                 FetchDoor(browser: browser, fetches: fetches, arrowEdge: prefs.sidePosition == .right ? .leading : .trailing,
                           quiet: true)
                 Spacer(minLength: 0)
+                if spacesInRow {
+                    SpaceRow(browser: browser, side: side)
+                    Spacer(minLength: 0)
+                    Door(icon: "plus", on: browser.makingSpace, help: "New Space") {
+                        if !browser.makingSpace { browser.askForSpace() }
+                    }
+                }
             }
+            .environment(\.footDoor, side)
             .padding(.horizontal, 10)
             .padding(.bottom, 10)
         }
+    }
+
+    /// The foot's square for these settings: 30 points with Roomy.
+    @MainActor static func door(_ prefs: Preferences) -> CGFloat { prefs.roomyTabs ? 30 : 26 }
+    private var side: CGFloat { SideFoot.door(prefs) }
+
+    /// The doors that stay whatever happens: bookmarks, the puzzle without
+    /// the address bar, a profile's badge, downloads while they show.
+    private var fixed: Int {
+        var kept = browser.addressBarUp ? 1 : 2
+        if Profiles.shared.several { kept += 1 }
+        if FetchDoor.shows(fetches, prefs, hanging: browser.downloadsHanging) { kept += 1 }
+        return kept
+    }
+    /// How many squares fit across the foot.
+    private var capacity: Int { Int(((width - 2 * 10 + 2) / (side + 2)).rounded(.down)) }
+    /// Every space in a row, when they fit beside + and the doors that
+    /// stay, with a little air either side to keep the row its own. A
+    /// space's place in the row is narrower than a door, as in Arc's.
+    private var spacesInRow: Bool {
+        guard prefs.usesSpaces else { return false }
+        let free = width - 2 * 10 - CGFloat(fixed + 1) * (side + 2) - 12
+        return CGFloat(browser.everySpace.count) * SpaceRow.slot(side) <= free
     }
 
     /// How many doors the foot has, stacked: what the rows stop short of.
@@ -1298,16 +1340,12 @@ private struct SideFoot: View {
         return kept
     }
 
-    /// How many pinned extensions fit beside the doors that stay. Every door
-    /// is 26 points, with 2 between them.
+    /// How many pinned extensions fit beside the doors that stay and the
+    /// spaces: a row of them and +, or the one space's door.
     private var room: Int {
-        let door: CGFloat = 26 + 2
-        var kept = browser.addressBarUp ? 1 : 2  // the puzzle and bookmarks
-        if prefs.usesSpaces { kept += 1 }
-        if Profiles.shared.several { kept += 1 }
-        if FetchDoor.shows(fetches, prefs, hanging: browser.downloadsHanging) { kept += 1 }
-        let free = width - 2 * 10 + 2 - CGFloat(kept) * door
-        return max(0, Int((free / door).rounded(.down)))
+        let row = (CGFloat(browser.everySpace.count) * SpaceRow.slot(side) + 12) / (side + 2)
+        let spaces = !prefs.usesSpaces ? 0 : spacesInRow ? Int(row.rounded(.up)) + 1 : 1
+        return max(0, capacity - fixed - spaces)
     }
 }
 
@@ -1863,20 +1901,33 @@ struct Speaker: View {
     }
 }
 
+/// The square of the buttons at the column's foot: 26 points, or 30 with
+/// Roomy, so they keep up with its taller tabs (SideFoot sets it).
+struct FootDoorKey: EnvironmentKey { static let defaultValue: CGFloat = 26 }
+extension EnvironmentValues {
+    var footDoor: CGFloat {
+        get { self[FootDoorKey.self] }
+        set { self[FootDoorKey.self] = newValue }
+    }
+}
+
 /// A small square holding one symbol. Lit when what it opens is open.
 struct Door: View {
     @Environment(\.greys) private var greys
+    @Environment(\.footDoor) private var footDoor
     let icon: String
     var on = false
     var help = ""
     /// What holding the button down opens, as Back and Forward list the
     /// pages that way. Nil, or a nil menu, and a hold is just a slow click.
     var held: (() -> NSMenu?)? = nil
-    /// Its square: 26 points, or more beside the address bar's roomier field.
-    var side: CGFloat = 26
+    /// Its square: given, as beside the address bar's roomier field, or the
+    /// foot's (footDoor), 26 points unless Roomy makes it more.
+    var side: CGFloat? = nil
     let act: () -> Void
 
     @State private var hovering = false
+    private var square: CGFloat { side ?? footDoor }
     /// The hold opened its menu: the click that ends the press is the
     /// menu's, not the button's.
     @State private var opened = false
@@ -1886,9 +1937,9 @@ struct Door: View {
             if opened { opened = false } else { act() }
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 11 * side / 26, weight: .medium))
+                .font(.system(size: 11 * square / 26, weight: .medium))
                 .foregroundStyle(on ? Palette.ink : (hovering ? Palette.ink.opacity(0.7) : Palette.muted))
-                .frame(width: side, height: side)
+                .frame(width: square, height: square)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(on ? greys.wash : (hovering ? greys.hover : .clear))
@@ -1924,7 +1975,7 @@ struct Door: View {
 /// list the pages as they were then. This view answers the hit test only for
 /// a right-click, so every other click and the hover fall through to the
 /// button beneath.
-private struct RightClick: NSViewRepresentable {
+struct RightClick: NSViewRepresentable {
     let menu: () -> NSMenu?
 
     func makeNSView(context: Context) -> Catcher { Catcher() }

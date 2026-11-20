@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // Another browser's profiles, each into a profile of its own here, and its
 // extensions, fresh from the Chrome Web Store.
@@ -131,14 +132,18 @@ enum ExtensionImport {
 
     static func install(_ addons: [ImportSource.Addon]) async -> Result {
         var result = Result()
-        for addon in addons where addon.comes {
-            switch await Extensions.shared.install(id: addon.id) {
+        let coming = addons.filter(\.comes)
+        let progress = ExtensionImportProgress.shared
+        for (index, addon) in coming.enumerated() {
+            progress.show(.init(name: addon.name, index: index + 1, total: coming.count, step: .downloading))
+            switch await Extensions.shared.install(id: addon.id, step: { progress.step($0) }) {
             case .installed: result.installed.append(addon.name)
             case .declined: result.declined.append(addon.name)
             case .already: break
             case .failed(let why): result.failed.append((addon.name, why))
             }
         }
+        progress.finish(coming.isEmpty ? nil : result)
         return result
     }
 
@@ -156,5 +161,141 @@ extension ImportSource.Addon {
         let names = addons.map(\.name)
         guard names.count > first + 1 else { return ListFormatter.localizedString(byJoining: names) }
         return names.prefix(first).joined(separator: ", ") + " and \(names.count - first) more"
+    }
+}
+
+/// Extensions being brought over, one after another: which, how far along
+/// the line, and what is happening to it — fetched from the Chrome Web
+/// Store, made ready, or waiting on your answer — so the pause between one
+/// question and the next says what it is. Then, for a moment, what came of
+/// it (ExtensionImportCard).
+@available(macOS 15.4, *)
+@MainActor
+final class ExtensionImportProgress: ObservableObject {
+    static let shared = ExtensionImportProgress()
+
+    struct Now: Equatable {
+        var name: String
+        var index: Int
+        var total: Int
+        var step: Extensions.InstallStep
+    }
+
+    @Published private(set) var now: Now?
+    /// What came of the last run, shown for a few seconds once it ends.
+    @Published private(set) var ended: ExtensionImport.Result?
+    private var turn = 0
+
+    func show(_ now: Now) {
+        turn += 1
+        ended = nil
+        self.now = now
+    }
+
+    func step(_ step: Extensions.InstallStep) { now?.step = step }
+
+    func finish(_ result: ExtensionImport.Result?) {
+        now = nil
+        guard let result else { return }
+        ended = result
+        let mine = turn
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            guard let self, self.turn == mine else { return }
+            self.ended = nil
+        }
+    }
+}
+
+/// The card at the window's bottom corner while extensions come over:
+/// "Installing ChatGPT · 2 of 7", what is happening to it, and a bar for
+/// the line; then what came of it.
+@available(macOS 15.4, *)
+struct ExtensionImportCard: View {
+    @ObservedObject private var progress = ExtensionImportProgress.shared
+
+    var body: some View {
+        ZStack {
+            if let now = progress.now {
+                card(title: now.name, note: Self.said(now.step), count: "\(now.index) of \(now.total)",
+                     fraction: (Double(now.index - 1) + Self.share(now.step)) / Double(max(now.total, 1)), busy: now.step != .asking)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if let ended = progress.ended {
+                card(title: ended.installed.isEmpty ? "No extensions installed" : "Extensions brought over",
+                     note: ended.said, count: nil, fraction: 1, busy: false)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Motion.settle, value: progress.now)
+        .animation(Motion.settle, value: progress.ended)
+    }
+
+    static func said(_ step: Extensions.InstallStep) -> String {
+        switch step {
+        case .downloading: return "Downloading from the Chrome Web Store…"
+        case .preparing: return "Getting it ready…"
+        case .asking: return "Waiting for your answer"
+        }
+    }
+
+    /// How far into one extension each step stands, for the bar.
+    static func share(_ step: Extensions.InstallStep) -> Double {
+        switch step {
+        case .downloading: return 0.15
+        case .preparing: return 0.6
+        case .asking: return 0.85
+        }
+    }
+
+    private func card(title: String, note: String, count: String?, fraction: Double, busy: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Group {
+                    if busy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: count == nil ? "checkmark.circle.fill" : "questionmark.circle")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Palette.ink.opacity(0.8))
+                    }
+                }
+                .frame(width: 18, height: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(count == nil ? title : "Installing \(title)")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        if let count {
+                            Text(count)
+                                .font(.system(size: 11.5).monospacedDigit())
+                                .foregroundStyle(Palette.muted)
+                        }
+                    }
+                    Text(note)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(2)
+                        .contentTransition(.opacity)
+                }
+            }
+            if count != nil {
+                GeometryReader { box in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Palette.ink.opacity(0.1))
+                        Capsule().fill(Palette.ink.opacity(0.7))
+                            .frame(width: max(6, box.size.width * min(max(fraction, 0), 1)))
+                    }
+                }
+                .frame(height: 4)
+                .animation(Motion.settle, value: fraction)
+            }
+        }
+        .padding(14)
+        .frame(width: 320, alignment: .leading)
+        .background(Palette.ground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
+        .shadow(color: .black.opacity(0.14), radius: 20, y: 8)
+        .accessibilityElement(children: .combine)
     }
 }

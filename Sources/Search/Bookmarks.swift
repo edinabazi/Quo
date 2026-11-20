@@ -1092,6 +1092,10 @@ struct BookmarkOutline: View {
 struct BookmarkDoor: View {
     @ObservedObject var browser: Browser
     let arrowEdge: Edge
+    /// At the column's foot: the list rises over the window as a card of
+    /// its own (BookmarksFloat), not a popover. In the window's corner a
+    /// popover's arrow had nowhere to point from but its own corner, and bent.
+    var floats = false
 
     var body: some View {
         Group {
@@ -1101,7 +1105,7 @@ struct BookmarkDoor: View {
                 BookmarkDoor.door(browser, kept: false)
             }
         }
-        .popover(isPresented: $browser.bookmarksOpen, arrowEdge: arrowEdge) {
+        .popover(isPresented: floats ? .constant(false) : $browser.bookmarksOpen, arrowEdge: arrowEdge) {
             if let id = browser.bookmarkCard {
                 BookmarkCard(browser: browser, bookmarks: browser.bookmarks, id: id)
             } else {
@@ -1256,6 +1260,62 @@ struct BookmarkCard: View {
 }
 
 /// The button's dropdown: the tree, and the two things that aren't in it.
+/// The bookmarks list, or one bookmark's card, risen from the foot of the
+/// column over whatever is there: a card with no arrow, as Arc's are. A
+/// click anywhere else or Escape puts it away.
+struct BookmarksFloat: View {
+    @ObservedObject var browser: Browser
+    /// The foot's square, which the card stands just above.
+    let above: CGFloat
+    let onRight: Bool
+    @State private var keys: Any?
+
+    var body: some View {
+        ZStack(alignment: onRight ? .bottomTrailing : .bottomLeading) {
+            if browser.bookmarksOpen {
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+                    .onTapGesture { browser.bookmarksOpen = false }
+                Group {
+                    if let id = browser.bookmarkCard {
+                        BookmarkCard(browser: browser, bookmarks: browser.bookmarks, id: id)
+                    } else {
+                        BookmarksDropdown(browser: browser, bookmarks: browser.bookmarks)
+                    }
+                }
+                .background(Palette.ground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
+                .shadow(color: .black.opacity(0.18), radius: 22, y: 8)
+                .padding(onRight ? .trailing : .leading, 10)
+                .padding(.bottom, above + 16)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.94, anchor: onRight ? .bottomTrailing : .bottomLeading))
+                        .combined(with: .offset(y: 6)),
+                    removal: .opacity.combined(with: .scale(scale: 0.97, anchor: onRight ? .bottomTrailing : .bottomLeading))))
+                .onAppear(perform: listen)
+                .onDisappear(perform: stop)
+            }
+        }
+        .animation(Motion.reduced ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: browser.bookmarksOpen)
+    }
+
+    /// Escape puts it away, wherever the keys are.
+    private func listen() {
+        stop()
+        keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.keyCode == 53, browser.bookmarksOpen, event.window === browser.window else { return event }
+            browser.bookmarksOpen = false
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let keys { NSEvent.removeMonitor(keys) }
+        keys = nil
+    }
+}
+
 struct BookmarksDropdown: View {
     @ObservedObject var browser: Browser
     let bookmarks: Bookmarks

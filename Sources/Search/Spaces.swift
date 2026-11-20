@@ -547,7 +547,13 @@ extension Browser {
         afterSpaceCreated = onCreated
         // In place, where the next space would come in, in the column or the
         // bar alike; a question only while the tabs are folded out of sight.
-        if !folded || peeking {
+        if prefs.sidebar, !folded || peeking {
+            // In the column, in place: the tabs and pins give way and the
+            // card rises in (SpaceCard), as Arc's.
+            spaceStep = 1
+            spaceCardRises = true
+            withAnimation(Motion.reduced ? nil : SpaceCard.change) { makingSpace = true }
+        } else if !folded || peeking {
             let here = spaces.firstIndex { $0.id == spaceID } ?? 0
             SpaceSwipe.shared.start(for: self)
             SpaceSwipe.shared.slide(self, to: spaces.count, from: here)
@@ -721,6 +727,7 @@ struct SpaceWash: View {
 }
 
 struct SpaceDot: View {
+    @Environment(\.footDoor) private var footDoor
     @ObservedObject var browser: Browser
     @State private var hovering = false
     /// What is drawn, a step behind the browser: the space changes in a
@@ -742,7 +749,7 @@ struct SpaceDot: View {
         Button { SpaceMenu.show(for: browser) } label: {
             ZStack {
                 Image(systemName: shown?.symbol ?? symbol)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 12 * footDoor / 26, weight: .medium))
                     .foregroundStyle(tint ?? (hovering ? Palette.ink : Palette.muted))
                     .id(shown?.key ?? key)
                     // The way the tabs go: sideways in the column; in the bar
@@ -751,7 +758,7 @@ struct SpaceDot: View {
                         ? (browser.spaceStep > 0 ? .trailing : .leading)
                         : (browser.spaceStep > 0 ? .bottom : .top)))
             }
-            .frame(width: SpaceDot.width, height: 26)
+            .frame(width: footDoor, height: footDoor)
             .clipped()
             .background(
                 // A coloured space's dot sits on a wash of its colour, enough
@@ -808,6 +815,58 @@ struct SpaceDot: View {
             guard turn == naming else { return }
             named = nil
         }
+    }
+}
+
+/// Every space across the column's foot, as Arc has them: each its icon,
+/// the one you're in lit in its colour on a soft ground that slides to the
+/// next as you switch, the others quiet. A click goes to that space; on the
+/// one you're in, or a right-click on any, the space's menu.
+struct SpaceRow: View {
+    @ObservedObject var browser: Browser
+    let side: CGFloat
+    @State private var hovered: UUID?
+    @Namespace private var lit
+
+    /// Each space's place in the row: a little narrower than a door.
+    static func slot(_ side: CGFloat) -> CGFloat { side - 4 }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(browser.everySpace) { space in
+                let on = space.id == browser.spaceID && !browser.makingSpace
+                let over = hovered == space.id
+                Button {
+                    if on { SpaceMenu.show(for: browser) } else { browser.switchSpace(to: space.id) }
+                } label: {
+                    Image(systemName: space.symbol)
+                        .font(.system(size: 12.5 * side / 26, weight: on ? .semibold : .medium))
+                        .foregroundStyle(on ? (space.tint ?? Palette.ink) : over ? Palette.ink.opacity(0.75) : Palette.muted.opacity(0.8))
+                        .frame(width: SpaceRow.slot(side), height: side)
+                        .background {
+                            if on {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill((space.tint ?? Palette.ink).opacity(space.tint == nil ? 0.08 : 0.16))
+                                    .matchedGeometryEffect(id: "lit", in: lit)
+                            } else if over {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.hover)
+                            }
+                        }
+                        .scaleEffect(over && !on && !Motion.reduced ? 1.06 : 1)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .overlay { RightClick { SpaceMenu.menu(for: browser) } }
+                .onHover { inside in
+                    if inside { hovered = space.id } else if hovered == space.id { hovered = nil }
+                }
+                .help(space.name)
+                .accessibilityLabel(space.name)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+        .animation(Motion.reduced ? nil : .spring(response: 0.35, dampingFraction: 0.8), value: browser.spaceID)
+        .animation(Motion.quick, value: hovered)
     }
 }
 

@@ -551,7 +551,11 @@ struct ContentView: View {
             // An extension that is slowing pages down, offered On click
             // (SlowExtensions.swift): at the page's far side, away from the
             // column, over the page's foot.
-            SlowExtensionCard()
+            VStack(alignment: sideOnRight ? .leading : .trailing, spacing: 10) {
+                // Extensions being brought over, one after another.
+                if #available(macOS 15.4, *) { ExtensionImportCard() }
+                SlowExtensionCard()
+            }
                 .padding(20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: sideOnRight ? .bottomLeading : .bottomTrailing)
                 .padding(.leading, sideOnRight ? 0 : roomed.width)
@@ -587,6 +591,9 @@ struct ContentView: View {
                     .padding(.top, band + (addressShown ? AddressBar.height(browser.prefs) : 0))
                     .transition(.opacity)
             }
+
+            // The bookmarks, risen from the column's foot as a card over
+            // everything (BookmarksFloat), the foot's button under it.
         }
         .ignoresSafeArea()
         .background { fullscreenWatch }
@@ -706,6 +713,15 @@ struct ContentView: View {
     /// gap before it with the page as a card, or its hairline edge to edge.
     private var panelRoom: CGFloat {
         panelUp ? panelWidth + (cards ? Metrics.cardGap : 1) : 0
+    }
+
+    /// The bookmarks risen from the column's foot (BookmarksFloat): only
+    /// with the column out, as rows, and nothing filling the screen.
+    @ViewBuilder
+    private var bookmarksFloat: some View {
+        if browser.prefs.sidebar, !browser.prefs.iconColumn, !browser.folded, fullscreenTab == nil {
+            BookmarksFloat(browser: browser, above: SideFoot.door(browser.prefs), onRight: sideOnRight)
+        }
     }
 
     private var sidePanel: some View {
@@ -916,6 +932,8 @@ struct ContentView: View {
                 }
             }
             .overlay(alignment: .bottom) { bars }
+            // The bookmarks risen from the column's foot, over the column.
+            .overlay { bookmarksFloat.ignoresSafeArea() }
             .overlay {
                 // Over the page only: the column, the strip and the bookmarks
                 // bar stay as they are, uncovered and in reach.

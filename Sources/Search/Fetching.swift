@@ -673,6 +673,7 @@ final class Fetches: ObservableObject {
 /// wherever Settings says (see Browser.showDownloads) — beside it, as the
 /// side panel's card floating there (DownloadsFloat), among them.
 struct FetchDoor: View {
+    @Environment(\.footDoor) private var footDoor
     /// How far the icon swells when a download starts, and how long it takes
     /// each way. Under Reduce Motion it goes nowhere, for the same length: a
     /// keyframe of no length comes out as not a number, and AppKit stops the
@@ -764,7 +765,8 @@ struct FetchDoor: View {
                     CubicKeyframe(pulse.peak, duration: pulse.up)
                     CubicKeyframe(1, duration: pulse.down)
                 }
-                .frame(width: 26, height: 26)
+                .scaleEffect(footDoor / 26)
+                .frame(width: footDoor, height: footDoor)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(hovering ? Palette.hover : .clear)

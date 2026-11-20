@@ -766,6 +766,12 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
+    /// Where an install from the store is: fetching the package, unpacking
+    /// and preparing it, or waiting on the question.
+    enum InstallStep: Equatable {
+        case downloading, preparing, asking
+    }
+
     /// How an install from the store went, for an import to say.
     enum Outcome: Equatable {
         case installed
@@ -781,7 +787,7 @@ final class Extensions: NSObject, ObservableObject {
     /// not — before it returns, so several brought over from another
     /// browser go one after another.
     @discardableResult
-    func install(id: String, confirm: Bool = true) async -> Outcome {
+    func install(id: String, confirm: Bool = true, step: ((InstallStep) -> Void)? = nil) async -> Outcome {
         // A store id, and nothing else, goes into the request and the folder
         // names below, whoever called.
         guard id.count == 32, id.allSatisfy({ ("a"..."p").contains($0) }) else { return .failed("not a Chrome Web Store id") }
@@ -791,11 +797,16 @@ final class Extensions: NSObject, ObservableObject {
         let staged = Extensions.stagingFolder(for: id)
         defer { try? FileManager.default.removeItem(at: staged) }
         do {
+            step?(.downloading)
             let crx = try await Crx.fetch(id)
+            step?(.preparing)
+            // A frame for the step to be drawn before the work holds the thread.
+            await Task.yield()
             let zip = try Crx.verifiedZip(crx, id: id)
             let target = Extensions.folder(for: id)
             try Crx.unpack(zip, into: staged)
             try ExtensionShims.prepare(staged, fresh: true)
+            step?(.asking)
             let took = try await admit(staged, as: id, fromStore: true, finalFolder: target, confirm: confirm || !Store.testing)
             return took ? .installed : .declined
         } catch {

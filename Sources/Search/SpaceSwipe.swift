@@ -124,7 +124,9 @@ final class SpaceSwipe {
     /// snaps back without moving (Motion.settle).
     private func carry(_ browser: Browser, to offset: CGFloat, then arrived: @escaping () -> Void) {
         guard !Motion.reduced else { return arrived() }
-        withAnimation(.easeOut(duration: 0.22), completionCriteria: .removed) {
+        // A soft start and a long settle, as a page turned by hand: the
+        // quick ease-out this was snapped the tabs away.
+        withAnimation(.smooth(duration: 0.38), completionCriteria: .removed) {
             browser.spaceSwipe = offset
         } completion: {
             arrived()
@@ -301,16 +303,31 @@ struct NewSpaceCard: View {
     /// In the bar across the top: one row, the height of the tabs.
     var inline = false
     @State private var name = ""
-    @State private var icon = "briefcase"
+    /// The first icon no space wears yet, chosen once, as it is made: the
+    /// card is drawn coming in, then again where it lands, and picked on
+    /// each appearance it crossfaded at the end of the slide.
+    @State private var icon: String
     @State private var choosing = false
     /// Signed in where the other spaces are, or starting afresh.
     @State private var shared = true
     @State private var hovering = false
     @FocusState private var typing: Bool
 
+    init(browser: Browser, inline: Bool = false) {
+        self.browser = browser
+        self.inline = inline
+        rises = browser.spaceCardRises
+        _icon = State(initialValue: browser.freeIcon)
+    }
+
     private var saying: String {
         shared ? "Signed in wherever your other spaces are." : "Its own cookies and sign-ins, starting from none."
     }
+
+    private var roomy: Bool { browser.prefs.roomyTabs }
+    /// Taken when the card is made: a swipe draws it coming in and again
+    /// where it lands, and it rises only when + opened it.
+    private let rises: Bool
 
     var body: some View {
         Group {
@@ -328,39 +345,45 @@ struct NewSpaceCard: View {
                 }
                 .frame(height: Metrics.strip)
             } else {
-                VStack(spacing: 12) {
-                    pick(size: 20, box: CGSize(width: 44, height: 40))
+                // A size up with Roomy, as the column is; each part rising in
+                // on its turn as the card comes (CardRise).
+                VStack(spacing: roomy ? 14 : 12) {
+                    pick(size: roomy ? 24 : 20, box: roomy ? CGSize(width: 52, height: 48) : CGSize(width: 44, height: 40))
+                        .modifier(CardRise(order: 0, rises: rises))
                     VStack(spacing: 4) {
                         Text("New space")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: roomy ? 15 : 13, weight: .semibold))
                             .foregroundStyle(Palette.ink)
                         Text("Its own tabs.")
-                            .font(.system(size: 11))
+                            .font(.system(size: roomy ? 12.5 : 11))
                             .foregroundStyle(Palette.muted)
                             .multilineTextAlignment(.center)
                     }
+                    .modifier(CardRise(order: 1, rises: rises))
                     field
+                        .modifier(CardRise(order: 2, rises: rises))
                     // Most people want Google and the rest to know them here too;
                     // some want a clean slate.
                     VStack(spacing: 6) {
-                        Segmented(options: [(true, "Signed in"), (false, "Signed out")], selection: $shared, wide: true)
+                        Segmented(options: [(true, "Signed in"), (false, "Signed out")], selection: $shared, wide: true, large: roomy)
                         Text(saying)
-                            .font(.system(size: 11))
+                            .font(.system(size: roomy ? 12.5 : 11))
                             .foregroundStyle(Palette.muted)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .modifier(CardRise(order: 3, rises: rises))
                     HStack(spacing: 8) {
-                        Pill("Cancel") { cancel() }
-                        Pill("Create", filled: true) { create() }
+                        Pill("Cancel", large: roomy) { cancel() }
+                        Pill("Create", filled: true, large: roomy) { create() }
                     }
+                    .modifier(CardRise(order: 4, rises: rises))
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity)
             }
         }
         .onAppear {
-            icon = browser.freeIcon
             DispatchQueue.main.async { typing = true }
         }
         .onExitCommand(perform: cancel)
@@ -391,9 +414,9 @@ struct NewSpaceCard: View {
     private var field: some View {
         TextField(inline ? "New space" : "Name", text: $name)
             .textFieldStyle(.plain)
-            .font(.system(size: inline ? 12.5 : 13))
-            .padding(.horizontal, 10)
-            .frame(height: inline ? 26 : 30)
+            .font(.system(size: inline ? 12.5 : roomy ? 14.5 : 13))
+            .padding(.horizontal, roomy && !inline ? 12 : 10)
+            .frame(height: inline ? 26 : roomy ? 38 : 30)
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.wash))
             .focused($typing)
             .onSubmit(create)
@@ -427,14 +450,22 @@ struct NewSpaceCard: View {
     private func create() {
         let named = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !named.isEmpty else { typing = true; return }
-        browser.addSpace(named: named, icon: icon, sharesSignIns: shared)
+        // In the column the card gives way to the new space's page as it
+        // came (SpaceCard's transitions); in the bar, at once.
+        withAnimation(inline || Motion.reduced ? nil : SpaceCard.change) {
+            browser.addSpace(named: named, icon: icon, sharesSignIns: shared)
+        }
     }
 
     /// Back to the space it was made from, the way it came.
     private func cancel() {
         browser.cancelSpaceCreation()
-        let back = browser.spaces.firstIndex { $0.id == browser.spaceID } ?? 0
-        SpaceSwipe.shared.slide(browser, to: back, from: browser.spaces.count)
+        if inline {
+            let back = browser.spaces.firstIndex { $0.id == browser.spaceID } ?? 0
+            SpaceSwipe.shared.slide(browser, to: back, from: browser.spaces.count)
+        } else {
+            withAnimation(Motion.reduced ? nil : SpaceCard.change) { browser.makingSpace = false }
+        }
     }
 }
 
@@ -452,5 +483,56 @@ struct SwipeShift: ViewModifier {
 
     func body(content: Content) -> some View {
         content.offset(x: across ? offset.value + by : 0, y: across ? 0 : offset.value + by)
+    }
+}
+
+/// The new space's card coming into the column and going: the tabs and
+/// pins sink back and fade, the card rises in after them a part at a time,
+/// and the same the other way.
+enum SpaceCard {
+    /// The change that takes the column to the card and back.
+    static let change = Animation.smooth(duration: 0.42)
+
+    /// The space's page: out quickly, a little smaller, and back in once
+    /// the card has gone, a little after.
+    static var page: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
+                .animation(.smooth(duration: 0.42).delay(0.1)),
+            removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .top))
+                .animation(.smooth(duration: 0.24))
+        )
+    }
+
+    /// The card: in once the page is on its way out (its parts rise on
+    /// their own turns), out quickly and a little smaller.
+    static var card: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.animation(.smooth(duration: 0.3).delay(0.12)),
+            removal: .opacity.combined(with: .scale(scale: 0.95)).animation(.smooth(duration: 0.22))
+        )
+    }
+}
+
+/// A part of the new space's card rising into place on its turn: from a
+/// little below, soft to sharp.
+struct CardRise: ViewModifier {
+    let order: Int
+    /// False: there already, as when a swipe brings the card.
+    var rises = true
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || Motion.reduced ? 0 : 10)
+            .blur(radius: shown || Motion.reduced ? 0 : 4)
+            .onAppear {
+                guard rises else { return shown = true }
+                withAnimation(Motion.reduced ? .easeOut(duration: 0.15)
+                              : .spring(response: 0.5, dampingFraction: 0.86).delay(0.16 + Double(order) * 0.05)) {
+                    shown = true
+                }
+            }
     }
 }

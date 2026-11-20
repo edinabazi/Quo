@@ -2,10 +2,14 @@ import AppKit
 import SwiftUI
 
 // The first time, as Arc and Dia do it: the whole window, a slow living
-// gradient behind frosted cards, each step's words and choices rising in one
-// after another. Six steps, every one of them skippable, nothing asked twice:
+// light in graphite greys behind frosted cards, as monochrome as the mark,
+// each step's words and choices rising in one after another. Six steps,
+// every one of them skippable, nothing asked twice:
 //
-//   1. Welcome: the mark, floating.
+//   1. Welcome: the opening — the window dark, the mark blooming out of it
+//      with a burst of light and a ring spreading away, then the stage
+//      coming up behind it and the words unfurling under it. Once, the
+//      first time the step shows.
 //   2. Make it yours: light or dark, where the tabs go, Roomy or Compact,
 //      the first space's colour, with a small window that changes as you pick.
 //   3. Bring your things: Arc's spaces and pins if Arc is here, or another
@@ -53,9 +57,20 @@ struct WelcomePanel: View {
     /// Arc's spaces and pins, brought over once this is done: Bring Things
     /// Over is a tab, which would open under this.
     @State private var arcAfter = false
+    /// Arc's spaces and pins asked for, on its row (see bring).
+    @State private var wantsArcSpaces = true
 
     @State private var isDefault = Links.isDefault
     @State private var askedDefault = false
+
+    /// The opening (see welcome): 0 the window dark, 1 the mark lit in it,
+    /// 2 the stage up and the words in. Played once; Back to the first
+    /// step finds it settled.
+    @State private var opening = 2
+    /// The light that spreads away from the mark as it lights, and the
+    /// glint that crosses it.
+    @State private var wave = false
+    @State private var glint = false
 
     static let steps = 6
     private var reduced: Bool { Motion.reduced }
@@ -64,15 +79,21 @@ struct WelcomePanel: View {
         self.browser = browser
         self.prefs = prefs
         _step = State(initialValue: step)
+        _opening = State(initialValue: step == 0 && !Motion.reduced ? 0 : 2)
     }
 
     var body: some View {
         ZStack {
-            Stage(step: step, reduced: reduced)
+            Color.black.ignoresSafeArea()
+            Stage(browser: browser, reduced: reduced)
                 .ignoresSafeArea()
+                .opacity(opening >= 2 ? 1 : 0)
+                .animation(.easeInOut(duration: 1.6), value: opening)
 
             VStack(spacing: 0) {
                 top
+                    .opacity(opening >= 2 ? 1 : 0)
+                    .animation(.easeOut(duration: 0.6).delay(0.6), value: opening)
                 Spacer(minLength: 12)
                 ZStack {
                     switch step {
@@ -96,6 +117,15 @@ struct WelcomePanel: View {
             .padding(.horizontal, 48)
             .padding(.top, 28)
             .padding(.bottom, 32)
+        }
+        // Extensions coming over, from here or anywhere: the same card as
+        // the window's, which this covers.
+        .overlay(alignment: .bottomTrailing) {
+            if #available(macOS 15.4, *) {
+                ExtensionImportCard()
+                    .padding(.trailing, 24)
+                    .padding(.bottom, 96)
+            }
         }
         .environment(\.colorScheme, .dark)
         .animation(reduced ? .easeOut(duration: 0.2) : .spring(response: 0.55, dampingFraction: 0.86), value: step)
@@ -144,7 +174,7 @@ struct WelcomePanel: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .frame(maxWidth: 860)
+        .frame(maxWidth: step == 1 ? 860 : 640)
         .frame(height: 44)
         .opacity(step == 0 || step == WelcomePanel.steps - 1 ? 0 : 1)
     }
@@ -158,65 +188,133 @@ struct WelcomePanel: View {
 
     private var welcome: some View {
         VStack(spacing: 30) {
-            Floating(reduced: reduced) {
-                AppMark(height: 96)
-                    .shadow(color: .white.opacity(0.22), radius: 40)
-                    .shadow(color: .black.opacity(0.35), radius: 20, y: 14)
+            ZStack {
+                // The burst of light the mark comes out of, and the ring
+                // that spreads away from it: only while it lights.
+                Circle()
+                    .fill(RadialGradient(colors: [.white.opacity(0.55), .white.opacity(0.12), .clear],
+                                         center: .center, startRadius: 0, endRadius: 220))
+                    .frame(width: 440, height: 440)
+                    .scaleEffect(opening == 1 ? 1.2 : 0.3)
+                    .opacity(opening == 1 ? 1 : 0)
+                    .allowsHitTesting(false)
+                // A wave of soft light, and a fine ring catching the light
+                // as it turns, both spreading away and gone.
+                Circle()
+                    .fill(RadialGradient(gradient: Gradient(stops: [
+                        .init(color: .clear, location: 0.45),
+                        .init(color: .white.opacity(0.22), location: 0.78),
+                        .init(color: .clear, location: 1),
+                    ]), center: .center, startRadius: 0, endRadius: 75))
+                    .frame(width: 150, height: 150)
+                    .scaleEffect(wave ? 4.2 : 0.6)
+                    .opacity(wave ? 0 : (opening >= 1 ? 1 : 0))
+                    .allowsHitTesting(false)
+                Circle()
+                    .strokeBorder(AngularGradient(colors: [.white.opacity(0), .white.opacity(0.95), .white.opacity(0.1),
+                                                           .white.opacity(0.7), .white.opacity(0)], center: .center),
+                                  lineWidth: 1.2)
+                    .blur(radius: 0.6)
+                    .frame(width: 150, height: 150)
+                    .rotationEffect(.degrees(wave ? 200 : 0))
+                    .scaleEffect(wave ? 6 : 0.8)
+                    .opacity(wave ? 0 : (opening >= 1 ? 1 : 0))
+                    .allowsHitTesting(false)
+                Floating(reduced: reduced) {
+                    AppMark(height: 96)
+                        // A glint crossing the mark as it lights, in its shape.
+                        .overlay {
+                            LinearGradient(colors: [.clear, .white.opacity(0.75), .clear], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: 46)
+                                .rotationEffect(.degrees(18))
+                                .offset(x: glint ? 110 : -110)
+                                .opacity(glint ? 0 : 1)
+                                .blendMode(.plusLighter)
+                                .mask(AppMark(height: 96))
+                                .allowsHitTesting(false)
+                        }
+                        .shadow(color: .white.opacity(opening == 1 ? 0.55 : 0.18), radius: opening == 1 ? 60 : 36)
+                        .shadow(color: .black.opacity(0.35), radius: 20, y: 14)
+                }
+                .scaleEffect(opening == 0 ? 0.5 : opening == 1 ? 1.3 : 1)
+                .opacity(opening == 0 ? 0 : 1)
+                .blur(radius: opening == 0 ? 20 : 0)
             }
-            .rise(0)
-            VStack(spacing: 14) {
-                Text("Welcome to \(Store.name)")
-                    .font(.system(size: 50, weight: .semibold))
-                    .tracking(-1)
-                    .foregroundStyle(.white)
-                    .rise(1)
-                Text("A fast, quiet browser for your Mac, with the habits you love from Arc and Chrome, on the engine already inside it.")
-                    .font(.system(size: 17))
-                    .foregroundStyle(.white.opacity(0.68))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .frame(maxWidth: 480)
-                    .rise(2)
-            }
-            VStack(spacing: 14) {
+            .frame(height: 120)
+            if opening >= 2 {
+                VStack(spacing: 14) {
+                    Text("Welcome to \(Store.name)")
+                        .font(.system(size: 50, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .modifier(Unfurl())
+                    Text("A fast, quiet browser for the Mac, with Arc's habits on the engine already inside it.")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                        .frame(maxWidth: 440)
+                        .rise(3)
+                }
                 Primary("Get Started", large: true) { go(1) }
                     .keyboardShortcut(.defaultAction)
-                Text("A minute or so. Everything here can be changed later in Settings.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.top, 8)
+                    .rise(5)
             }
-            .padding(.top, 8)
-            .rise(3)
+        }
+        .onAppear(perform: open)
+    }
+
+    /// The opening, the first time the first step shows: dark, then the
+    /// mark lit with its burst and ring, then the stage and the words, the
+    /// mark rising to make room for them.
+    private func open() {
+        guard opening == 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(.spring(response: 1.1, dampingFraction: 0.62)) { opening = 1 }
+            withAnimation(.easeOut(duration: 1.9)) { wave = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            withAnimation(.easeInOut(duration: 0.8)) { glint = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
+            withAnimation(.spring(response: 1.0, dampingFraction: 0.84)) { opening = 2 }
         }
     }
 
     // MARK: - 2. make it yours
 
     private var yours: some View {
-        HStack(alignment: .center, spacing: 36) {
-            VStack(alignment: .leading, spacing: 20) {
-                Heading("Make it yours.", "Pick a look to start with. The window on the right follows along.")
-                    .rise(0)
+        // The heading over both; the choices and the window beside them,
+        // the same height and their tops in line.
+        let tall: CGFloat = 256
+        return VStack(alignment: .leading, spacing: 24) {
+            Heading("Make it yours.", "The window on the right follows along.")
+                .rise(0)
+            HStack(alignment: .top, spacing: 28) {
                 Glass {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Row("Appearance") {
                             Chips(options: [(Look.light, "Light", "sun.max"), (Look.dark, "Dark", "moon"), (Look.system, "Auto", "circle.lefthalf.filled")],
                                   selection: $prefs.look)
                         }
+                        .frame(maxHeight: .infinity)
                         Row("Tabs") {
                             Chips(options: [(TabsLayout.left, "Left", "sidebar.left"), (TabsLayout.right, "Right", "sidebar.right"), (TabsLayout.top, "Top", "rectangle.topthird.inset.filled")],
                                   selection: Binding(get: { prefs.tabsLayout == .icons ? .left : prefs.tabsLayout },
                                                      set: { layout in withAnimation(Motion.glide) { prefs.tabsLayout = layout } }))
                         }
+                        .frame(maxHeight: .infinity)
                         Row("Density") {
                             Chips(options: [(true, "Roomy", "rectangle.expand.vertical"), (false, "Compact", "rectangle.compress.vertical")],
                                   selection: Binding(get: { prefs.roomyTabs }, set: { on in withAnimation(Motion.glide) { prefs.roomyTabs = on } }))
                         }
+                        .frame(maxHeight: .infinity)
                         Row("Colour") {
                             // A colour is a space's: picked, spaces come on
-                            // to wear it. The wheel beside them is the whole
-                            // picker, as the space's Colour… has it.
-                            HStack(spacing: 10) {
+                            // to wear it, and the stage behind takes it. The
+                            // wheel beside them is the whole picker, as the
+                            // space's Colour… has it.
+                            HStack(spacing: 8) {
                                 Swatches(selection: Binding(get: { browser.space.colour },
                                                             set: { colour in
                                                                 if colour > 0, !prefs.usesSpaces { prefs.usesSpaces = true }
@@ -225,16 +323,16 @@ struct WelcomePanel: View {
                                 WheelButton(browser: browser, prefs: prefs)
                             }
                         }
+                        .frame(maxHeight: .infinity)
                     }
                 }
+                .frame(height: tall)
                 .rise(1)
+                MiniWindow(layout: prefs.tabsLayout, roomy: prefs.roomyTabs, look: prefs.look,
+                           tint: browser.space.tint)
+                    .frame(width: (tall * 1.42).rounded(), height: tall)
+                    .rise(2)
             }
-            .frame(width: 420)
-            MiniWindow(layout: prefs.tabsLayout, roomy: prefs.roomyTabs, look: prefs.look,
-                       tint: browser.space.tint)
-                .frame(maxWidth: .infinity)
-                .aspectRatio(1.45, contentMode: .fit)
-                .rise(2)
         }
     }
 
@@ -248,7 +346,10 @@ struct WelcomePanel: View {
         return VStack(alignment: .leading, spacing: 20) {
             Heading("Bring your things.", "Nothing in the other browser changes, and nothing leaves your Mac.")
                 .rise(0)
-            if arcHere {
+            // Arc's spaces and pins are a row of the Arc card below when Arc
+            // is one to bring from; only when its data can't be read is
+            // this card how they come over.
+            if arcHere, !sources.contains(where: { $0.name == "Arc" }) {
                 Glass(highlight: true) {
                     HStack(spacing: 16) {
                         Badge(symbol: "square.stack.3d.up.fill")
@@ -284,70 +385,84 @@ struct WelcomePanel: View {
                             Spacer()
                         }
                         if chosen.importsPasswords {
-                            Toggled("Passwords", counted(preview?.passwords, "Into your Mac's keychain; macOS asks once"), on: $wantsPasswords)
+                            Toggled("Passwords", counted(preview?.passwords, "Into your Mac's keychain"), on: $wantsPasswords,
+                                    empty: preview?.passwords == 0)
                         }
-                        Toggled("Bookmarks", counted(preview?.bookmarks, "Folders and all"), on: $wantsBookmarks)
-                        Toggled("History", counted(preview?.places, "So the address field already knows where you go"), on: $wantsHistory)
+                        Toggled("Bookmarks", counted(preview?.bookmarks, "With their folders"), on: $wantsBookmarks,
+                                empty: preview?.bookmarks == 0)
+                        Toggled("History", counted(preview?.places, "So the address field knows where you go"), on: $wantsHistory,
+                                empty: preview?.places == 0)
+                        if arcHere, chosen.name == "Arc" {
+                            Toggled("Spaces and pins", "Your spaces, pinned tabs and folders, as you left them", on: $wantsArcSpaces)
+                        }
                         if let list = profileLists[chosen.id], list.count > 1 {
-                            Toggled("Profiles", "\(list.count) — \(ListFormatter.localizedString(byJoining: list.map(\.name))), each its own profile here with its own bookmarks and history",
+                            Toggled("Profiles", "\(list.count) — \(ListFormatter.localizedString(byJoining: list.map(\.name))), each a profile here",
                                     on: Binding(get: { wantsProfiles }, set: { wantsProfiles = $0; brought = nil; count(chosen) }))
                         }
                         let fresh = freshExtensions(preview)
                         if !fresh.isEmpty {
-                            Toggled("Extensions", "\(fresh.count) — \(ImportSource.Addon.names(fresh)), fresh from the Chrome Web Store; you say yes to each",
+                            Toggled("Extensions", "\(fresh.count) — \(ImportSource.Addon.names(fresh)). You confirm each one",
                                     on: $wantsExtensions)
                         }
                         if let left = preview?.leftBehind, !left.isEmpty {
                             Text(left.allSatisfy(\.lookFor)
                                  ? "\(chosen.name)'s add-ons can't run here: \(ImportSource.Addon.names(left, first: 4)). Look for them in the Chrome Web Store."
-                                 : "Can't come over: " + left.prefix(4).map { "\($0.name) (\($0.skip ?? ""))" }.joined(separator: ", ")
+                                 : "Can't come over: " + left.prefix(4).map { "\(WelcomePanel.named($0.name)) (\($0.skip ?? ""))" }.joined(separator: ", ")
                                     + (left.count > 4 ? " and \(left.count - 4) more — see Settings › Bring Things Over" : ""))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white.opacity(0.45))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        // What came over at the left; the button at the right,
+                        // where the eye ends up after the switches.
                         HStack(spacing: 12) {
                             if let brought {
                                 Done(brought)
+                                Spacer(minLength: 0)
                             } else {
-                                Primary(bringing ? "Bringing…" : "Bring Them In") { bringAll(from: chosen) }
-                                    .disabled(bringing || !((chosen.importsPasswords && wantsPasswords) || wantsHistory || wantsBookmarks
-                                                            || (wantsExtensions && !fresh.isEmpty)))
+                                Spacer(minLength: 0)
                                 if bringing { ProgressView().controlSize(.small) }
+                                Primary(bringing ? "Bringing…" : "Bring Them In") { bringAll(from: chosen) }
+                                    .disabled(bringing || !wanted(chosen, preview: preview, fresh: fresh))
                             }
                         }
+                        .padding(.top, 4)
                         .animation(Motion.settle, value: brought)
                     }
                 }
                 .rise(arcHere ? 2 : 1)
             }
             // Here, but kept from this app by macOS: said by name with the
-            // way to allow it, never "no other browser".
+            // way to allow it, never "no other browser". One card for all
+            // of them, a button each.
             if !refused.isEmpty {
+                let names = ListFormatter.localizedString(byJoining: refused.map(\.source.name))
                 Glass {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(refused.indices, id: \.self) { index in
-                            let missing = refused[index]
-                            HStack(spacing: 16) {
-                                Badge(symbol: "lock.fill")
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(missing.source.name) is on this Mac")
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    Text("macOS keeps its data from other apps until you allow \(Store.name) to read it.")
-                                        .font(.system(size: 12.5))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer(minLength: 8)
-                                Primary("Allow Access…") { allow(missing.source) }
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(alignment: .center, spacing: 16) {
+                            Badge(symbol: "lock.fill")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(names) \(refused.count == 1 ? "is" : "are") on this Mac too")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("macOS keeps \(refused.count == 1 ? "its" : "their") data from other apps until you allow \(Store.name) to read it.")
+                                    .font(.system(size: 12.5))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
+                        HStack(spacing: 8) {
+                            ForEach(refused.indices, id: \.self) { index in
+                                Ghost("Allow \(refused[index].source.name)…") { allow(refused[index].source) }
+                            }
+                        }
+                        .padding(.leading, 60)
                         if let allowTrouble {
                             Text(allowTrouble)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white.opacity(0.6))
                                 .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 60)
                         }
                     }
                 }
@@ -363,13 +478,32 @@ struct WelcomePanel: View {
                 .rise(1)
             }
         }
+        .animation(Motion.settle, value: source)
+        .animation(Motion.settle, value: previews.count)
+        .animation(Motion.settle, value: refused.count)
         .onAppear { if found == nil { look() } }
+    }
+
+    /// Something there is to bring: a switch on over something found, or
+    /// still being counted.
+    private func wanted(_ source: ImportSource, preview: ImportSource.Preview?, fresh: [ImportSource.Addon]) -> Bool {
+        (source.name == "Arc" && wantsArcSpaces && FileManager.default.fileExists(atPath: Arc.file.path))
+            || (source.importsPasswords && wantsPasswords && preview?.passwords != 0)
+            || (wantsBookmarks && preview?.bookmarks != 0)
+            || (wantsHistory && preview?.places != 0)
+            || (wantsExtensions && !fresh.isEmpty)
+    }
+
+    /// An extension's name as it should read: one loaded from a folder
+    /// without a name of its own has only its id, which says nothing.
+    static func named(_ name: String) -> String {
+        name.range(of: "^[a-p]{32}$", options: .regularExpression) != nil ? "An unnamed extension" : name
     }
 
     /// "312 — Folders and all", or the words alone while counting.
     private func counted(_ n: Int?, _ detail: String) -> String {
         guard let n else { return detail }
-        return n == 0 ? "None — \(detail.prefix(1).lowercased() + detail.dropFirst())" : "\(n.formatted()) — \(detail)"
+        return n == 0 ? "Nothing to bring" : "\(n.formatted()) — \(detail)"
     }
 
     /// Every profile, each into its own, or the one used most recently.
@@ -438,7 +572,7 @@ struct WelcomePanel: View {
         return VStack(spacing: 26) {
             ZStack {
                 Circle()
-                    .fill(RadialGradient(colors: [Color(red: 0.35, green: 0.65, blue: 1).opacity(0.55), .clear],
+                    .fill(RadialGradient(colors: [.white.opacity(0.3), .clear],
                                          center: .center, startRadius: 2, endRadius: 70))
                     .frame(width: 140, height: 140)
                 Image(systemName: "icloud.fill")
@@ -447,7 +581,7 @@ struct WelcomePanel: View {
                     .overlay(alignment: .bottomTrailing) {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(red: 0.2, green: 0.45, blue: 1))
+                            .foregroundStyle(.black)
                             .padding(6)
                             .background(Circle().fill(.white))
                             .offset(x: 10, y: 6)
@@ -459,7 +593,7 @@ struct WelcomePanel: View {
                     .font(.system(size: 36, weight: .semibold))
                     .tracking(-0.6)
                     .foregroundStyle(.white)
-                Text("Spaces, pins, bookmarks and settings, kept in step through your own iCloud.")
+                Text("Spaces, pins, bookmarks and settings, through your own iCloud.")
                     .font(.system(size: 15.5))
                     .foregroundStyle(.white.opacity(0.65))
                     .multilineTextAlignment(.center)
@@ -467,10 +601,9 @@ struct WelcomePanel: View {
             .rise(1)
             Glass {
                 VStack(alignment: .leading, spacing: 16) {
-                    Point("lock.shield.fill", "End-to-end encrypted", "Sealed with a key only your devices hold. Not even Apple can read it, and neither can we.")
-                    Point("person.crop.circle.badge.checkmark", "No account to make", "Your Apple ID is all it takes. No password, no email, nothing to sign up for.")
-                    Point("hand.raised.fill", "Nothing on our servers", "There aren't any. Everything stays in your own iCloud.")
-                    Point("bolt.fill", "In moments", "A pin added on one Mac is on the others before you've switched.")
+                    Point("lock.shield.fill", "End-to-end encrypted", "Only your devices hold the key. Not Apple, not us.")
+                    Point("person.crop.circle.badge.checkmark", "No account to make", "Your Apple ID is all it takes.")
+                    Point("bolt.fill", "In moments", "A pin added on one Mac is on the others before you switch.")
                 }
             }
             .frame(maxWidth: 560)
@@ -505,11 +638,11 @@ struct WelcomePanel: View {
     private var protection: some View {
         let popular = FilterLists.suggested.filter { $0.within == nil }.prefix(3)
         return VStack(alignment: .leading, spacing: 20) {
-            Heading("Fewer ads, less tracking.", "Blocked before the page even loads: pages come in faster and follow you around less.")
+            Heading("Fewer ads, less tracking.", "Blocked before the page loads, so pages come in faster.")
                 .rise(0)
             Glass {
                 VStack(alignment: .leading, spacing: 14) {
-                    Toggled("Block ads and trackers", "\(Store.name)'s own blocker, built into the engine", on: $prefs.shielded)
+                    Toggled("Block ads and trackers", "Built into the engine", on: $prefs.shielded)
                     if prefs.shielded {
                         Divider().overlay(Color.white.opacity(0.1))
                         Text("Add the lists other blockers use")
@@ -536,7 +669,7 @@ struct WelcomePanel: View {
                         Text("Open links in \(Store.name)")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
-                        Text("Links from Mail, Slack and everywhere else land here.")
+                        Text("Links from Mail, Slack and other apps land here.")
                             .font(.system(size: 13))
                             .foregroundStyle(.white.opacity(0.6))
                     }
@@ -568,7 +701,7 @@ struct WelcomePanel: View {
                         .font(.system(size: 50, weight: .semibold))
                         .tracking(-1)
                         .foregroundStyle(.white)
-                    Text("Six keys worth knowing. Every other one is in Settings › Keyboard & Mouse.")
+                    Text("Six keys worth knowing. The rest are in Settings.")
                         .font(.system(size: 15.5))
                         .foregroundStyle(.white.opacity(0.62))
                 }
@@ -593,6 +726,13 @@ struct WelcomePanel: View {
     // MARK: - doing
 
     private func bringAll(from source: ImportSource) {
+        // What was found empty isn't asked for: no keychain prompt for
+        // passwords there aren't.
+        let found = previews[previewKey(source)]
+        let wantsPasswords = self.wantsPasswords && found?.passwords != 0
+        let wantsBookmarks = self.wantsBookmarks && found?.bookmarks != 0
+        let wantsHistory = self.wantsHistory && found?.places != 0
+        if source.name == "Arc", wantsArcSpaces, FileManager.default.fileExists(atPath: Arc.file.path) { arcAfter = true }
         let each = eachProfile(source)
         let profile = profile(of: source)
         let extensions = wantsExtensions ? freshExtensions(previews[previewKey(source)]) : []
@@ -641,6 +781,8 @@ struct WelcomePanel: View {
                 }
             }
         }
+        // Arc's spaces and pins come once the onboarding is done (finish).
+        if arcAfter, source.name == "Arc" { lines.append("spaces and pins right after this") }
         if #available(macOS 15.4, *), !extensions.isEmpty {
             // Asked about one at a time; the step can be left meanwhile.
             lines.append(extensions.count == 1 ? "1 extension to confirm" : "\(extensions.count) extensions to confirm")
@@ -669,59 +811,32 @@ struct WelcomePanel: View {
 
 // MARK: - the stage
 
-/// The gradient behind it all: slow, soft, a little different on each step.
+/// The ground behind it all: the window's own, black as a space with no
+/// colour is, and the first space's colour, gradient and grain over it,
+/// drawn a step stronger than the window wears them, so what is picked on
+/// Make It Yours fills the stage as it is picked. A soft light drifts over
+/// it, the edges in shade.
 private struct Stage: View {
-    let step: Int
+    @ObservedObject var browser: Browser
     let reduced: Bool
 
-    /// Four colours a step, from the deep corner to the bright one.
-    static let palettes: [[Color]] = [
-        [rgb(0x0B0A1F), rgb(0x2A1B6E), rgb(0x5B3FD6), rgb(0x0F5D7A)],   // welcome: violet into teal
-        [rgb(0x140B1E), rgb(0x5A1E5C), rgb(0xD0487C), rgb(0x2B1A6B)],   // make it yours: magenta
-        [rgb(0x08141F), rgb(0x0E3B5C), rgb(0x2E86C1), rgb(0x1B2A6B)],   // bring: ocean
-        [rgb(0x050B1C), rgb(0x0B2A6B), rgb(0x2F7BFF), rgb(0x5FB8FF)],   // sync: iCloud blue
-        [rgb(0x07150F), rgb(0x0D4A3A), rgb(0x1FA67A), rgb(0x1B3B6B)],   // protection: green
-        [rgb(0x1A0A12), rgb(0x6B1E3A), rgb(0xF0784C), rgb(0x5B3FD6)],   // all set: sunset
-    ]
-
-    static func rgb(_ hex: UInt32) -> Color {
-        Color(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
-    }
-
     var body: some View {
-        let colors = Stage.palettes[min(step, Stage.palettes.count - 1)]
         TimelineView(.animation(minimumInterval: 1 / 30, paused: reduced)) { time in
             let t = reduced ? 0 : time.date.timeIntervalSinceReferenceDate
             ZStack {
-                colors[0]
-                field(colors, t: t)
+                Color(white: 0.075)
+                SpaceWash(look: browser.wash, space: browser.washSpace)
+                    .environment(\.washStrength, browser.washStrength == .subtle ? .rich : browser.washStrength)
+                    .environment(\.washGrain, browser.washGrain)
+                    .animation(.easeInOut(duration: 0.6), value: browser.wash)
+                // A soft light drifting slowly over it, as through frosted glass.
+                RadialGradient(colors: [.white.opacity(0.07), .clear],
+                               center: UnitPoint(x: 0.5 + 0.25 * Foundation.sin(t * 0.07), y: 0.32 + 0.12 * Foundation.cos(t * 0.09)),
+                               startRadius: 0, endRadius: 640)
+                GrainWash(opacity: 0.04)
+                RadialGradient(colors: [.clear, .black.opacity(0.5)], center: .center, startRadius: 300, endRadius: 1000)
                 // A soft shade at the foot, for the buttons to stand on.
-                LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .center, endPoint: .bottom)
-            }
-        }
-        .animation(.easeInOut(duration: 1.1), value: step)
-    }
-
-    @ViewBuilder
-    private func field(_ c: [Color], t: Double) -> some View {
-        if #available(macOS 15.0, *) {
-            let s = Swift.Float(Foundation.sin(t * 0.21)), k = Swift.Float(Foundation.cos(t * 0.17))
-            MeshGradient(width: 3, height: 3, points: [
-                [0, 0], [0.5 + 0.08 * s, 0], [1, 0],
-                [0, 0.5 + 0.1 * k], [0.5 + 0.12 * k, 0.5 + 0.1 * s], [1, 0.5 - 0.1 * k],
-                [0, 1], [0.5 - 0.08 * s, 1], [1, 1],
-            ], colors: [
-                c[0], c[1], c[0],
-                c[3], c[2], c[1],
-                c[0], c[3], c[0],
-            ], smoothsColors: true)
-        } else {
-            ZStack {
-                RadialGradient(colors: [c[2].opacity(0.85), .clear], center: UnitPoint(x: 0.5 + 0.12 * Foundation.cos(t * 0.17), y: 0.45),
-                               startRadius: 10, endRadius: 520)
-                RadialGradient(colors: [c[3].opacity(0.7), .clear], center: UnitPoint(x: 0.1, y: 0.8 + 0.05 * Foundation.sin(t * 0.21)),
-                               startRadius: 10, endRadius: 460)
-                RadialGradient(colors: [c[1].opacity(0.8), .clear], center: UnitPoint(x: 0.9, y: 0.1), startRadius: 10, endRadius: 420)
+                LinearGradient(colors: [.clear, .black.opacity(0.3)], startPoint: .center, endPoint: .bottom)
             }
         }
     }
@@ -752,6 +867,25 @@ private struct Rise: ViewModifier {
     }
 }
 
+/// The welcome's title, opening out: from widely spaced and soft to set
+/// tight and sharp, as the stage comes up.
+private struct Unfurl: ViewModifier {
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .tracking(shown || Motion.reduced ? -1 : 14)
+            .opacity(shown ? 1 : 0)
+            .blur(radius: shown || Motion.reduced ? 0 : 10)
+            .scaleEffect(shown || Motion.reduced ? 1 : 0.96)
+            .onAppear {
+                withAnimation(Motion.reduced ? .easeOut(duration: 0.2) : .spring(response: 1.2, dampingFraction: 0.9).delay(0.15)) {
+                    shown = true
+                }
+            }
+    }
+}
+
 /// Drifting up and down a few points, forever.
 private struct Floating<Content: View>: View {
     let reduced: Bool
@@ -775,12 +909,12 @@ private struct Heading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 36, weight: .semibold))
+                .font(.system(size: 34, weight: .semibold))
                 .tracking(-0.6)
                 .foregroundStyle(.white)
             Text(line)
                 .font(.system(size: 15))
-                .foregroundStyle(.white.opacity(0.62))
+                .foregroundStyle(.white.opacity(0.58))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -796,14 +930,16 @@ private struct Glass<Content: View>: View {
         content()
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .background(Color.white.opacity(highlight ? 0.1 : 0.04), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            // Dark glass, the same on any desktop: a deep, slightly
+            // clear ground, a breath of white, and an edge lit from above.
+            .background(Color.white.opacity(highlight ? 0.08 : 0.045), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [.white.opacity(highlight ? 0.4 : 0.22), .white.opacity(0.05)],
+                    .strokeBorder(LinearGradient(colors: [.white.opacity(highlight ? 0.24 : 0.14), .white.opacity(0.04)],
                                                  startPoint: .top, endPoint: .bottom), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
+            .shadow(color: .black.opacity(0.3), radius: 30, y: 14)
     }
 }
 
@@ -866,42 +1002,80 @@ private struct WheelButton: View {
     @ObservedObject var prefs: Preferences
     @State private var open = false
     @State private var hovering = false
+    /// The hues turning: from the pointer coming in until the glow has faded.
+    @State private var spinning = false
 
     private var custom: Bool {
         let space = browser.space
         return space.gradient != nil || (space.look != nil && space.colour == 0) || space.grain != nil
     }
 
+    private static let hues = AngularGradient(colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .red],
+                                              center: .center)
+
     var body: some View {
         Button { open = true } label: {
+            // Under the pointer the hues turn, slowly, and glow behind it;
+            // the + stays upright, so it never reads as a ×. Only the turn is
+            // drawn frame by frame (Turning): the glow's fade is outside it,
+            // where each new frame doesn't set it straight to where it ends.
             ZStack {
-                Circle().fill(AngularGradient(colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .red],
-                                              center: .center))
-                Circle().fill(RadialGradient(colors: [.white.opacity(0.85), .white.opacity(0)], center: .center,
-                                             startRadius: 0, endRadius: 9))
+                Turning(on: spinning) { Circle().fill(WheelButton.hues) }
+                    .blur(radius: 7)
+                    .scaleEffect(hovering ? 1.15 : 0.9)
+                    .opacity(hovering ? 0.75 : 0)
+                Turning(on: spinning) { Circle().fill(WheelButton.hues) }
+                Circle().fill(RadialGradient(colors: [.white.opacity(hovering ? 0.95 : 0.85), .white.opacity(0)], center: .center,
+                                             startRadius: 0, endRadius: hovering ? 10 : 9))
                 Image(systemName: "plus")
                     .font(.system(size: 9, weight: .heavy))
-                    .foregroundStyle(.black.opacity(0.55))
+                    .foregroundStyle(.black.opacity(hovering ? 0.7 : 0.55))
                     .opacity(custom ? 0 : 1)
             }
             .frame(width: 22, height: 22)
             .padding(3)
             .overlay(Circle().strokeBorder(.white, lineWidth: custom ? 2 : 0))
-            .scaleEffect(hovering || custom ? 1.08 : 1)
-            .rotationEffect(.degrees(hovering && !Motion.reduced ? 30 : 0))
+            .scaleEffect(hovering ? 1.16 : custom ? 1.08 : 1)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .onHover { on in withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { hovering = on } }
+        // In and out on a smooth curve with no bounce: a spring that
+        // overshot faded the glow past nothing and back, a flash on the way
+        // out. The hues keep turning until the glow has gone.
+        .onHover { on in
+            if on { spinning = true }
+            withAnimation(on ? .smooth(duration: 0.45) : .smooth(duration: 0.55)) { hovering = on }
+            if !on {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { if !hovering { spinning = false } }
+            }
+        }
         .help("More colours, gradients and grain")
         .accessibilityLabel("More colours")
         .popover(isPresented: $open, arrowEdge: .bottom) {
             SpaceLookPicker(browser: browser, id: browser.spaceID)
+                // Dark like the stage it opens over, whatever the window's
+                // look is set to: light, its frame went pale under text
+                // drawn for the dark.
+                .preferredColorScheme(.dark)
                 // A drag the popover closed under keeps nothing but what was.
                 .onDisappear { if LookDraft.shared.preview != nil { LookDraft.shared.end() } }
         }
         .onChange(of: browser.space.look) { _, look in
             if look != nil, !prefs.usesSpaces { prefs.usesSpaces = true }
+        }
+    }
+}
+
+/// Its content turning slowly while `on`, and resting where it got to
+/// when not. Only the turn is drawn every frame.
+private struct Turning<Content: View>: View {
+    let on: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !on || Motion.reduced)) { time in
+            content()
+                .rotationEffect(.degrees(Motion.reduced ? 0 : (time.date.timeIntervalSinceReferenceDate * 80).truncatingRemainder(dividingBy: 360)))
         }
     }
 }
@@ -1023,9 +1197,9 @@ private struct MiniWindow: View {
 
     private var lights: some View {
         HStack(spacing: 5) {
-            Circle().fill(Color(red: 1, green: 0.37, blue: 0.34)).frame(width: 8, height: 8)
-            Circle().fill(Color(red: 1, green: 0.74, blue: 0.18)).frame(width: 8, height: 8)
-            Circle().fill(Color(red: 0.16, green: 0.79, blue: 0.25)).frame(width: 8, height: 8)
+            ForEach(0..<3, id: \.self) { _ in
+                Circle().fill(ink.opacity(0.22)).frame(width: 8, height: 8)
+            }
         }
     }
 }
@@ -1104,7 +1278,7 @@ private struct Done: View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 16))
-                .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 0.5))
+                .foregroundStyle(.white)
                 .scaleEffect(shown ? 1 : 0.3)
             Text(text)
                 .font(.system(size: 13.5, weight: .medium))
@@ -1119,26 +1293,35 @@ private struct Toggled: View {
     let title: String
     let detail: String
     @Binding var on: Bool
-    init(_ title: String, _ detail: String, on: Binding<Bool>) { self.title = title; self.detail = detail; _on = on }
+    /// Nothing there to bring: shown off and quiet, not to be switched.
+    var empty = false
+    init(_ title: String, _ detail: String, on: Binding<Bool>, empty: Bool = false) {
+        self.title = title; self.detail = detail; _on = on; self.empty = empty
+    }
 
     var body: some View {
-        Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { on.toggle() } } label: {
+        let on = self.on && !empty
+        Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { self.on.toggle() } } label: {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
-                    Text(detail).font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
+                    Text(detail).font(.system(size: 12)).foregroundStyle(.white.opacity(0.5)).lineLimit(2)
                 }
                 Spacer(minLength: 8)
                 ZStack(alignment: on ? .trailing : .leading) {
-                    Capsule().fill(on ? Color(red: 0.3, green: 0.85, blue: 0.5) : Color.white.opacity(0.16))
+                    Capsule().fill(on ? Color.white : Color.white.opacity(0.16))
                         .frame(width: 40, height: 24)
-                    Circle().fill(.white).frame(width: 20, height: 20).padding(2)
+                    Circle().fill(on ? Color.black : .white).frame(width: 20, height: 20).padding(2)
                         .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
                 }
             }
             .contentShape(Rectangle())
+            .opacity(empty ? 0.45 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(empty)
+        .animation(Motion.settle, value: empty)
+        .animation(Motion.settle, value: detail)
     }
 }
 
@@ -1153,7 +1336,7 @@ private struct Point: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1))
+                .foregroundStyle(.white.opacity(0.9))
                 .frame(width: 30, height: 30)
                 .background(Circle().fill(Color.white.opacity(0.1)))
             VStack(alignment: .leading, spacing: 2) {
@@ -1206,7 +1389,7 @@ private struct Keycap: View {
     }
 }
 
-/// A short burst of colour as the last step comes in.
+/// A short burst of white and grey as the last step comes in.
 private struct Confetti: View {
     let reduced: Bool
     @State private var start = Date()
@@ -1217,8 +1400,8 @@ private struct Confetti: View {
 
     private static let bits: [Bit] = {
         var generator = SystemRandomNumberGenerator()
-        let colors: [Color] = [.white, Color(red: 1, green: 0.47, blue: 0.3), Color(red: 0.36, green: 0.25, blue: 0.84),
-                               Color(red: 0.36, green: 0.72, blue: 1), Color(red: 1, green: 0.78, blue: 0.3), Color(red: 0.3, green: 0.85, blue: 0.5)]
+        // White and greys, as the rest of it: sparkle, not a party.
+        let colors: [Color] = [.white, .white, Color(white: 0.8), Color(white: 0.6), Color(white: 0.42)]
         return (0..<70).map { _ in
             Bit(angle: Double.random(in: -Double.pi...0, using: &generator),
                 speed: Double.random(in: 260...620, using: &generator),

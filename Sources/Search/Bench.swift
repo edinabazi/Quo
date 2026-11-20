@@ -4010,6 +4010,68 @@ final class Bench {
                 window.contentView = nil
             }
 
+        case "lookpicker":
+            // The space's Colour… picker (SpaceGradient.swift), drawn off
+            // screen as it stands for the space on screen, to a PNG at PATH.
+            guard Store.testing else { answer(["error": "lookpicker only works on a --test run"]); return }
+            guard let path = request["path"] as? String else { answer(["error": "lookpicker needs a path"]); return }
+            let host = NSHostingView(rootView: SpaceLookPicker(browser: browser, id: browser.spaceID)
+                .background(Palette.ground)
+                .environment(\.colorScheme, .dark))
+            host.frame = NSRect(origin: .zero, size: host.fittingSize)
+            let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: .darkAqua)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard let picture = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { answer(["error": "nothing drawn"]); return }
+                host.cacheDisplay(in: host.bounds, to: picture)
+                try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                window.contentView = nil
+                answer(["saved": path, "size": [Int(host.bounds.width), Int(host.bounds.height)]])
+            }
+
+        case "welcome":
+            // The onboarding (Welcome.swift) at a step, drawn off screen at
+            // the window's size and pictured at each of `times` seconds after
+            // it appears — the opening's frames, on the first step. No window
+            // on any screen; nothing chosen in it is kept.
+            guard Store.testing else { answer(["error": "welcome only works on a --test run"]); return }
+            guard let path = request["path"] as? String else { answer(["error": "welcome needs a path (a folder)"]); return }
+            let step = request["step"] as? Int ?? 0
+            let times = (request["times"] as? [Double]) ?? [3]
+            // An install of brought-over extensions shown as under way, for
+            // its card (ExtensionImportCard); "off" takes it away.
+            if #available(macOS 15.4, *), let importing = request["importing"] as? String {
+                if importing == "off" { ExtensionImportProgress.shared.finish(nil) } else {
+                    ExtensionImportProgress.shared.show(.init(name: importing, index: 2, total: 7, step: .downloading))
+                }
+            }
+            let size = NSSize(width: request["width"] as? Double ?? 1180, height: request["height"] as? Double ?? 780)
+            let host = NSHostingView(rootView: WelcomePanel(browser: browser, prefs: browser.prefs, step: step)
+                .frame(width: size.width, height: size.height))
+            host.frame = NSRect(origin: .zero, size: size)
+            let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            var made: [String] = []
+            for (index, time) in times.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + time) {
+                    host.layoutSubtreeIfNeeded()
+                    if let picture = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                        host.cacheDisplay(in: host.bounds, to: picture)
+                        let file = URL(fileURLWithPath: path).appendingPathComponent("welcome-\(step)-\(index).png")
+                        if (try? picture.representation(using: .png, properties: [:])?.write(to: file)) != nil { made.append(file.path) }
+                    }
+                    if index == times.count - 1 {
+                        window.contentView = nil
+                        var said: [String: Any] = ["made": made]
+                        if #available(macOS 15.4, *) { said["importing"] = ExtensionImportProgress.shared.now?.name ?? "" }
+                        answer(said)
+                    }
+                }
+            }
+
         case "profile":
             // The profiles (see Profiles.swift), for a test of what one keeps
             // apart. Test runs only: it makes and deletes profiles and windows.
@@ -4059,6 +4121,11 @@ final class Bench {
             guard Store.testing else { answer(["error": "space only works on a --test run"]); return }
             switch request["action"] as? String ?? "" {
             case "new": browser.addSpace(named: request["name"] as? String ?? "Test", sharesSignIns: request["fresh"] as? Bool != true)
+            // The + at the column's foot, and the card's Cancel.
+            case "ask": browser.askForSpace()
+            case "unask":
+                browser.cancelSpaceCreation()
+                withAnimation(SpaceCard.change) { browser.makingSpace = false }
             case "go": browser.switchSpace(index: (request["index"] as? Int ?? 1) - 1)
             case "delete": browser.deleteSpace(browser.spaceID)
             case "swipe":
@@ -4308,6 +4375,8 @@ final class Bench {
             if let on = request["settings"] as? Bool { browser.tuning = on }
             if let on = request["passwords"] as? Bool, Store.testing { browser.managing = on }
             if let on = request["welcome"] as? Bool { browser.welcoming = on }
+            // The bookmarks list from the column's foot (BookmarksFloat).
+            if let on = request["marksOpen"] as? Bool { browser.bookmarkCard = nil; browser.bookmarksOpen = on }
             if let on = request["history"] as? Bool { browser.recalling = on }
             if let on = request["downloads"] as? Bool { browser.hoarding = on }
             if let on = request["archive"] as? Bool { browser.archiving = on }
@@ -4538,7 +4607,7 @@ final class Bench {
 
         default:
             answer(["error": "unknown command “\(verb)”", "commands": [
-                "tabs", "open", "go", "openmark", "close", "wait", "sleep", "select", "text", "nowplaying", "agent", "kept", "eval", "click", "type", "submit", "shot", "snap", "probe", "key", "textcheck", "resize", "hit", "pointer", "film", "float", "window", "pages", "picture", "pdf", "place", "group", "tospace", "field", "bookmark", "marks", "menu", "keyeq", "fill", "pin", "middle", "windows", "alive", "quit", "towindow", "news", "pull", "magnify", "wheel", "space", "split", "strip", "column", "fold", "consent", "update", "site", "little", "ui", "import", "import-preview", "import-file", "import-file-start", "import-file-status", "import-file-cancel", "remove-folder", "passwords", "accounts", "find", "answer", "visible", "ai", "notifications", "popups", "suggest", "translate", "profile", "settings", "filterlists", "sync",
+                "tabs", "open", "go", "openmark", "close", "wait", "sleep", "select", "text", "nowplaying", "agent", "kept", "eval", "click", "type", "submit", "shot", "snap", "probe", "key", "textcheck", "resize", "hit", "pointer", "film", "float", "window", "pages", "picture", "pdf", "place", "group", "tospace", "field", "bookmark", "marks", "menu", "keyeq", "fill", "pin", "middle", "windows", "alive", "quit", "towindow", "news", "pull", "magnify", "wheel", "space", "split", "strip", "column", "welcome", "lookpicker", "fold", "consent", "update", "site", "little", "ui", "import", "import-preview", "import-file", "import-file-start", "import-file-status", "import-file-cancel", "remove-folder", "passwords", "accounts", "find", "answer", "visible", "ai", "notifications", "popups", "suggest", "translate", "profile", "settings", "filterlists", "sync",
 
                 "tabs", "open", "go", "openmark", "close", "wait", "sleep", "select", "text", "nowplaying", "player", "agent", "eval", "click", "type", "submit", "shot", "snap", "probe", "key", "textcheck", "resize", "hit", "pointer", "film", "float", "window", "pages", "picture", "pdf", "place", "group", "tospace", "field", "bookmark", "marks", "menu", "keyeq", "fill", "pin", "middle", "windows", "alive", "quit", "towindow", "news", "pull", "magnify", "wheel", "space", "split", "strip", "column", "fold", "consent", "update", "site", "little", "ui", "import", "import-preview", "import-file", "import-file-start", "import-file-status", "import-file-cancel", "remove-folder", "passwords", "accounts", "find", "answer", "visible", "ai", "notifications", "popups", "suggest", "translate", "profile", "settings",
             ]])

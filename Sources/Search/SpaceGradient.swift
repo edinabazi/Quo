@@ -908,7 +908,7 @@ struct SpaceLookPicker: View {
             }
         }
         .padding(16)
-        .frame(width: Self.width, alignment: .leading)
+        .frame(width: Self.width + (roomy ? 28 : 0), alignment: .leading)
         .onChange(of: angle) { _, new in
             if abs((turned - new).truncatingRemainder(dividingBy: 360)) > 0.5 { turned = new }
         }
@@ -1166,7 +1166,7 @@ struct SpaceLookPicker: View {
     private var grainControl: some View {
         let off = shownLook == nil
         return HStack(spacing: 10) {
-            GrainSlider(value: grain, look: shownLook, angle: angle) { amount in
+            GrainSlider(value: grain, look: shownLook, angle: angle, tall: roomy ? 26 : 20) { amount in
                 grainHeld = amount
                 draft.show(LookDraft.Preview(space: id, look: space.look, strength: space.washStrength, grain: amount))
             } done: { amount in
@@ -1176,9 +1176,9 @@ struct SpaceLookPicker: View {
                 }
             }
             Text(grain < 0.005 ? "None" : "\(Int((grain * 100).rounded()))%")
-                .font(.system(size: 11).monospacedDigit())
+                .font(.system(size: roomy ? 12.5 : 11).monospacedDigit())
                 .foregroundStyle(Palette.muted)
-                .frame(width: 34, alignment: .trailing)
+                .frame(width: roomy ? 38 : 34, alignment: .trailing)
         }
         .opacity(off ? 0.45 : 1)
         .disabled(off)
@@ -1205,12 +1205,15 @@ struct SpaceLookPicker: View {
             .help("Light, dark or the Mac's own, for every space, as in Settings › Appearance")
     }
 
+    /// Roomy: the rows and their controls a size up, as the column's are.
+    private var roomy: Bool { prefs.roomyTabs }
+
     private func row(_ title: String, @ViewBuilder _ content: () -> some View) -> some View {
         HStack(spacing: 10) {
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: roomy ? 12.5 : 11, weight: .medium))
                 .foregroundStyle(Palette.muted)
-                .frame(width: 70, alignment: .leading)
+                .frame(width: roomy ? 80 : 70, alignment: .leading)
             content()
         }
     }
@@ -1225,16 +1228,16 @@ struct SpaceLookPicker: View {
                 Button {
                     withAnimation(bouncy) { action(option.0) }
                 } label: {
-                    HStack(spacing: 4) {
-                        if let symbol = option.2 { Image(systemName: symbol).font(.system(size: 9, weight: .semibold)) }
-                        Text(option.1).font(.system(size: 11, weight: on ? .medium : .regular))
+                    HStack(spacing: roomy ? 5 : 4) {
+                        if let symbol = option.2 { Image(systemName: symbol).font(.system(size: roomy ? 10.5 : 9, weight: .semibold)) }
+                        Text(option.1).font(.system(size: roomy ? 12.5 : 11, weight: on ? .medium : .regular))
                     }
                     .foregroundStyle(on ? Palette.ink : Palette.muted)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 22)
+                    .frame(height: roomy ? 28 : 22)
                     .background {
                         if on {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            RoundedRectangle(cornerRadius: roomy ? 7 : 5, style: .continuous)
                                 .fill(Palette.ground)
                                 .shadow(color: .black.opacity(0.12), radius: 1, y: 0.5)
                                 .matchedGeometryEffect(id: key, in: segments)
@@ -1248,7 +1251,7 @@ struct SpaceLookPicker: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Palette.hover))
+        .background(RoundedRectangle(cornerRadius: roomy ? 9 : 7, style: .continuous).fill(Palette.hover))
     }
 
     // MARK: pieces
@@ -1374,16 +1377,19 @@ private struct GrainSlider: View {
     let value: Double
     let look: SpaceLook?
     let angle: Double
+    /// Its height: 20 points, more with Roomy; the knob a little less.
+    var tall: CGFloat = 20
     let changed: (Double) -> Void
     let done: (Double) -> Void
     @State private var holding = false
+    private var knob: CGFloat { tall - 2 }
 
     static let knob: CGFloat = 18
 
     var body: some View {
         GeometryReader { geo in
-            let track = RoundedRectangle(cornerRadius: 10, style: .continuous)
-            let room = max(geo.size.width - Self.knob - 2, 1)
+            let track = RoundedRectangle(cornerRadius: tall / 2, style: .continuous)
+            let room = max(geo.size.width - knob - 2, 1)
             ZStack(alignment: .leading) {
                 LookFill(look: look, angle: 90, grain: 0, shape: track)
                     .opacity(look == nil ? 1 : 0.85)
@@ -1394,7 +1400,7 @@ private struct GrainSlider: View {
                 track.strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5)
                 Circle()
                     .fill(Color.white)
-                    .frame(width: Self.knob, height: Self.knob)
+                    .frame(width: knob, height: knob)
                     .shadow(color: .black.opacity(0.25), radius: holding ? 4 : 2, y: holding ? 2 : 1)
                     .scaleEffect(holding ? 1.2 : 1)
                     .offset(x: 1 + room * value)
@@ -1405,15 +1411,15 @@ private struct GrainSlider: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
                         holding = true
-                        changed(Self.amount(at: drag.location.x, room: room))
+                        changed(Self.amount(at: drag.location.x, room: room, knob: knob))
                     }
                     .onEnded { drag in
                         holding = false
-                        done(Self.amount(at: drag.location.x, room: room))
+                        done(Self.amount(at: drag.location.x, room: room, knob: knob))
                     }
             )
         }
-        .frame(height: 20)
+        .frame(height: tall)
         .accessibilityElement()
         .accessibilityLabel("Grain")
         .accessibilityValue(value < 0.005 ? "None" : "\(Int((value * 100).rounded())) percent")
@@ -1423,7 +1429,7 @@ private struct GrainSlider: View {
         }
     }
 
-    static func amount(at x: CGFloat, room: CGFloat) -> Double {
+    static func amount(at x: CGFloat, room: CGFloat, knob: CGFloat = knob) -> Double {
         // Held to whole hundredths, and a touch of none at the left end.
         let raw = Double((x - 1 - knob / 2) / room)
         return raw < 0.02 ? 0 : SpaceGrain(raw).amount

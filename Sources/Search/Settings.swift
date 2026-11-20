@@ -1564,6 +1564,8 @@ struct Segmented<Option: Hashable>: View {
     /// True when the control has the whole width to itself, so the choices
     /// share it evenly instead of each taking only what its word needs.
     var wide = false
+    /// A size up, for Roomy.
+    var large = false
 
     @Namespace private var slide
 
@@ -1571,13 +1573,13 @@ struct Segmented<Option: Hashable>: View {
         HStack(spacing: 2) {
             ForEach(options, id: \.0) { option, title in
                 Text(title)
-                    .font(.system(size: 11.5, weight: option == selection ? .medium : .regular))
+                    .font(.system(size: large ? 13 : 11.5, weight: option == selection ? .medium : .regular))
                     .foregroundStyle(option == selection ? Palette.ink : Palette.muted)
                     .lineLimit(1)
                     .fixedSize(horizontal: !wide, vertical: false)
                     .frame(maxWidth: wide ? .infinity : nil)
                     .padding(.horizontal, wide ? 4 : 10)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, large ? 7 : 5)
                     .background {
                         if option == selection {
                             RoundedRectangle(cornerRadius: 7, style: .continuous)

@@ -2627,7 +2627,12 @@ final class Browser: NSObject, ObservableObject {
             if side != spaceSwipeSide { spaceSwipeSide = side }
         }
     }
-    @Published var makingSpace = false
+    @Published var makingSpace = false {
+        didSet { if !makingSpace { spaceCardRises = false } }
+    }
+    /// The new space's card rises in a part at a time: opened with +, not
+    /// brought by a swipe, which has it on screen the whole way already.
+    var spaceCardRises = false
     /// A tab being sent into the Space being made from its context menu.
     var afterSpaceCreated: ((Space) -> Void)?
     /// A link's page, peeked at over this one (see Peek.swift).

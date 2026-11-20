@@ -218,6 +218,7 @@ extension Browsers {
 /// space's icon, only once there is more than one profile. A click opens
 /// the list; choosing another brings its window, as in Chrome.
 struct ProfileBadge: View {
+    @Environment(\.footDoor) private var footDoor
     @ObservedObject var browser: Browser
     @ObservedObject var profiles = Profiles.shared
     @State private var hovering = false
@@ -231,7 +232,8 @@ struct ProfileBadge: View {
                 .foregroundStyle(hovering ? Palette.ink : Palette.muted)
                 .frame(width: 17, height: 17)
                 .background(Circle().strokeBorder(hovering ? Palette.ink.opacity(0.5) : Palette.muted.opacity(0.6), lineWidth: 1.2))
-                .frame(width: 26, height: 26)
+                .scaleEffect(footDoor / 26)
+                .frame(width: footDoor, height: footDoor)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(hovering ? Palette.hover : .clear)
