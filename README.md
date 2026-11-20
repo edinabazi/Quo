@@ -121,7 +121,7 @@ Quo updates itself with Search's own updater, pointed at Quo's GitHub releases i
 ./quo.sh release 0.1.1   # build, notarize and publish Quo 0.1.1
 ```
 
-That writes the version to `QUO_VERSION`, builds with the Developer ID and `Quo.provisionprofile`, notarizes the disk image and the ZIP, checks the signed feed, and makes the GitHub release `v0.1.1` (marked latest) with `Quo.dmg`, `Quo.zip` and the feed. What's new goes first in `QUO_NOTES.md`, one paragraph; it's the line under the version in Settings and the release's notes. It refuses to run with uncommitted or unpushed changes, or without the profile.
+First set `QUO_VERSION` to the new version and add its section to `QUO_NOTES.md` (`## 0.1.1 · date`, then what's new), commit and push. The release builds with the Developer ID and `Quo.provisionprofile`, notarizes the disk image and the ZIP, checks the signed feed, and makes the GitHub release `v0.1.1` (marked latest) with `Quo.dmg`, `Quo.zip` and the feed, its notes the version's section. The newest section's first paragraph is the line under the version in Settings, and every section is in Settings › About › What's New, above Search's. It refuses to run with uncommitted or unpushed changes, a version that isn't `QUO_VERSION`, notes without that version, or without the profile.
 
 It needs a notarytool profile called `quo`, made once with an app-specific password from account.apple.com:
 

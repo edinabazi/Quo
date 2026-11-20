@@ -4,8 +4,9 @@
 #
 #   ./quo.sh                  build build/Quo.app
 #   ./quo.sh install          build it and put it in /Applications (quits Quo first)
-#   ./quo.sh release [0.1.1]  build, notarise and publish a release on GitHub,
-#                             which every installed Quo then updates itself to
+#   ./quo.sh release [0.1.1]  build, notarise and publish the version in
+#                             QUO_VERSION on GitHub, which every installed Quo
+#                             then updates itself to
 #
 # Data lives in ~/Library/Application Support/Quo, the defaults under
 # com.edinabazi.quo, cookies and site data in WebKit's container for that id.
@@ -39,7 +40,12 @@ export SEARCH_NAME=Quo SEARCH_BUNDLE_ID=com.edinabazi.quo SEARCH_ICON=Icon/Quo.i
 export SEARCH_VERSION="$(tr -d '[:space:]' < QUO_VERSION)"
 
 if [ "${1:-}" = "release" ]; then
-  if [ -n "${2:-}" ]; then printf '%s\n' "$2" > QUO_VERSION; SEARCH_VERSION="$2"; fi
+  # The version named, if one is, is the one in QUO_VERSION: a release is
+  # built from what's committed, version and notes with it.
+  if [ -n "${2:-}" ] && [ "$2" != "$SEARCH_VERSION" ]; then
+    echo "release: QUO_VERSION says $SEARCH_VERSION — set it to $2, add \"## $2\" to QUO_NOTES.md, commit and push" >&2
+    exit 1
+  fi
   TAG="v$SEARCH_VERSION"
   # What a release needs, checked before anything is built.
   [ -f Quo.provisionprofile ] || { echo "release: Quo.provisionprofile is missing — without it Quo ships without iCloud" >&2; exit 1; }
@@ -47,6 +53,8 @@ if [ "${1:-}" = "release" ]; then
     || { echo "release: no notarytool profile \"quo\" — run: xcrun notarytool store-credentials quo --apple-id <you> --team-id $TEAM" >&2; exit 1; }
   gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 \
     && { echo "release: $TAG is out already — ./quo.sh release <next version>" >&2; exit 1; }
+  grep -q "^## $SEARCH_VERSION\( \|$\)" QUO_NOTES.md \
+    || { echo "release: QUO_NOTES.md has no \"## $SEARCH_VERSION\" — say what's new in it first" >&2; exit 1; }
   [ -z "$(git status --porcelain)" ] || { echo "release: commit first — a release is built from what's committed" >&2; exit 1; }
   git fetch -q origin
   git merge-base --is-ancestor HEAD "origin/$(git rev-parse --abbrev-ref HEAD)" \
@@ -60,8 +68,10 @@ if [ "${1:-}" = "release" ]; then
     || { rm -rf "$CHECK"; echo "release: the signed feed doesn't verify — not publishing" >&2; exit 1; }
   cmp -s "$CHECK/appcast.json" build/appcast.json || { rm -rf "$CHECK"; echo "release: the signed feed isn't build/appcast.json" >&2; exit 1; }
   rm -rf "$CHECK"
+  # The version's own section of QUO_NOTES.md, which has to be there.
   NOTESFILE="$(mktemp)"
-  awk 'NF { print; n++; next } n { exit }' QUO_NOTES.md > "$NOTESFILE"
+  awk -v v="$SEARCH_VERSION" '/^## / { if (have) exit; have = ($2 == v); next } have' QUO_NOTES.md \
+    | sed -e '/./,$!d' > "$NOTESFILE"
   gh release create "$TAG" --repo "$REPO" --target "$(git rev-parse HEAD)" --latest \
     --title "Quo $SEARCH_VERSION" --notes-file "$NOTESFILE" \
     build/Quo.dmg build/Quo.zip build/appcast.json build/appcast.json.zip

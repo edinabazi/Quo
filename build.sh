@@ -141,6 +141,11 @@ mv "$APP/Contents/MacOS/$NAME.sdk" "$APP/Contents/MacOS/$NAME"
 # Under a fork's own name, so Script Editor lists it as the app it is.
 sed -e "s/Search Terminology/$NAME Terminology/" -e "s/Search Suite/$NAME Suite/" \
     -e "s/description=\"Search\.\"/description=\"$NAME.\"/" Search.sdef > "$APP/Contents/Resources/Search.sdef"
+# A fork's own release notes (SEARCH_NOTES, QUO_NOTES.md), for Settings ›
+# About › What's New, above Search's (WhatsNew.swift, `own`).
+if [ -n "${SEARCH_NOTES:-}" ] && [ -f "$SEARCH_NOTES" ]; then
+  cp "$SEARCH_NOTES" "$APP/Contents/Resources/ReleaseNotes.md"
+fi
 
 # Symbols stay out of the app. The linker leaves every function's name and a
 # map back to the source in the binary — 15,000 entries, more than half of
@@ -433,7 +438,15 @@ BASE="${BASE%/}$SUBFOLDER"
 NOTES=""
 NOTESFILE="${SEARCH_NOTES:-NOTES.md}"
 if [ -f "$NOTESFILE" ]; then
-  NOTES="$(awk 'NF { printf "%s%s", (n++ ? " " : ""), $0; next } n { exit }' "$NOTESFILE" \
+  # A fork's notes (QUO_NOTES.md) put each version under "## version": the
+  # newest one's first paragraph. Search's are one paragraph a version.
+  HEADS="$(grep -c '^## ' "$NOTESFILE" || true)"
+  NOTES="$(awk -v heads="${HEADS:-0}" '
+      heads > 0 && /^## / { if (have) exit; have = 1; next }
+      heads > 0 && !have { next }
+      /^#/ { next }
+      NF { printf "%s%s", (n++ ? " " : ""), $0; next }
+      n { exit }' "$NOTESFILE" \
     | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 fi
 # The AI add-on's engine (engine.sh), when this release offers one: Apple

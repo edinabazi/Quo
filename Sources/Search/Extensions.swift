@@ -2555,16 +2555,91 @@ private struct ExtensionIcon: View {
             .frame(width: size + 4, height: size + 4)
             .opacity(button.enabled ? 1 : 0.4)
             if !button.badge.isEmpty {
-                Text(button.badge)
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(Palette.ground)
-                    .padding(.horizontal, 3)
-                    .frame(minWidth: 12, minHeight: 11)
-                    .background(Palette.ink, in: Capsule())
-                    .fixedSize()
+                ExtensionBadge(text: button.badge)
                     .offset(x: 5, y: 3)
             }
         }
+    }
+}
+
+/// The count or word an extension puts on its button (action.setBadgeText):
+/// a dot of the page's ink with the text in its middle, a circle for one
+/// character and a capsule for more. As in Chrome, four characters at most
+/// ("99+", "1234", "NEW"), and three or four a touch smaller, so the badge
+/// stays a badge on a 16-point icon.
+struct ExtensionBadge: View {
+    let text: String
+
+    static let height: CGFloat = 12
+
+    /// What fits: Chrome cuts a badge at four characters.
+    static func shown(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(trimmed.prefix(4))
+    }
+
+    /// The face: SF Rounded with figures all one width for one or two
+    /// characters, the condensed cut for three or four. One font for both
+    /// drawing and measuring, so the capsule is cut to the text.
+    static func font(for shown: String) -> NSFont {
+        let long = shown.count >= 3
+        let size: CGFloat = long ? 8 : 8.5
+        let base = long ? NSFont.systemFont(ofSize: size, weight: .bold, width: .condensed)
+                        : NSFont.systemFont(ofSize: size, weight: .bold)
+        var descriptor = long ? base.fontDescriptor : (base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor)
+        descriptor = descriptor.addingAttributes([.featureSettings: [[
+            NSFontDescriptor.FeatureKey.typeIdentifier: kNumberSpacingType,
+            NSFontDescriptor.FeatureKey.selectorIdentifier: kMonospacedNumbersSelector,
+        ]]])
+        return NSFont(descriptor: descriptor, size: size) ?? base
+    }
+
+    /// A circle for one character; for more, the text and room either side,
+    /// in whole points, even, so its middle is on a pixel at 1× and 2×.
+    static func width(for shown: String, font: NSFont) -> CGFloat {
+        guard shown.count > 1 else { return height }
+        let text = (shown as NSString).size(withAttributes: [.font: font]).width
+        let whole = (text + 6).rounded(.up)
+        return max(height, whole.truncatingRemainder(dividingBy: 2) == 0 ? whole : whole + 1)
+    }
+
+    /// How far to move the text so its capitals and figures, not its line,
+    /// are in the middle: SwiftUI centres a line from its ascender to its
+    /// descender, and figures sit above the descender's room.
+    private static func lift(_ font: NSFont) -> CGFloat {
+        let line = font.ascender - font.descender
+        let middleOfCaps = font.ascender - font.capHeight / 2
+        return line / 2 - middleOfCaps
+    }
+
+    /// How far to move the text across so its ink, not its advance, is in
+    /// the middle: a "1" or an "N" carries more room on one side than the
+    /// other.
+    static func shift(_ shown: String, font: NSFont) -> CGFloat {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: shown, attributes: [.font: font]))
+        let advance = CTLineGetTypographicBounds(line, nil, nil, nil)
+        let ink = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+        guard ink.width > 0 else { return 0 }
+        // In half points, a pixel on a Retina screen, where text is placed.
+        return ((CGFloat(advance) / 2 - ink.midX) * 2).rounded() / 2
+    }
+
+    var body: some View {
+        let shown = Self.shown(text)
+        let font = Self.font(for: shown)
+        Text(shown)
+            .font(Font(font))
+            .lineLimit(1)
+            .fixedSize()
+            .offset(x: Self.shift(shown, font: font), y: Self.lift(font))
+            .foregroundStyle(Palette.ground)
+            .frame(width: Self.width(for: shown, font: font), height: Self.height)
+            .background(Palette.ink, in: Capsule())
+            // Drawn as one picture: hung off the icon's corner the badge
+            // can land between pixels, and then the text, which snaps to
+            // them, and the capsule, which doesn't, drift a pixel apart.
+            .drawingGroup()
+            .accessibilityLabel(shown)
     }
 }
 

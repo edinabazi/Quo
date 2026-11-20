@@ -191,6 +191,55 @@ enum WhatsNew {
         let fixed: [String]
     }
 
+    /// A fork's own versions, newest first: the notes build.sh puts in the
+    /// bundle (SEARCH_NOTES, QUO_NOTES.md, as ReleaseNotes.md), each under
+    /// "## version · date", shown above Search's. None in Search itself.
+    struct Own: Equatable {
+        let version: String
+        let date: String
+        let paragraphs: [String]
+    }
+
+    static let own: [Own] = {
+        guard let url = Bundle.main.url(forResource: "ReleaseNotes", withExtension: "md"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        return parse(text)
+    }()
+
+    /// The versions in a fork's notes: a "## " line starts one ("0.1.0 ·
+    /// 20 November 2026"), and its paragraphs follow, each one line or
+    /// several run together. Anything before the first is the file's own.
+    static func parse(_ text: String) -> [Own] {
+        var found: [Own] = []
+        var heading: (version: String, date: String)?
+        var paragraphs: [String] = [], current: [String] = []
+        func endParagraph() {
+            if !current.isEmpty { paragraphs.append(current.joined(separator: " ")) }
+            current = []
+        }
+        func endVersion() {
+            endParagraph()
+            if let heading { found.append(Own(version: heading.version, date: heading.date, paragraphs: paragraphs)) }
+            paragraphs = []
+        }
+        for raw in text.components(separatedBy: .newlines) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("## ") {
+                endVersion()
+                let parts = line.dropFirst(3).split(separator: "·", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+                heading = (parts.first ?? "", parts.count > 1 ? parts[1] : "")
+            } else if line.hasPrefix("#") || heading == nil {
+                continue
+            } else if line.isEmpty {
+                endParagraph()
+            } else {
+                current.append(line)
+            }
+        }
+        endVersion()
+        return found.filter { !$0.version.isEmpty }
+    }
+
     /// Newest first.
     static let notes: [Notes] = [
         Notes(
@@ -661,6 +710,15 @@ struct ReleaseNotesPanel: View {
         Plate("What's New", width: 560, close: close) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
+                    ForEach(WhatsNew.own, id: \.version) { note in
+                        own(note)
+                    }
+                    if !WhatsNew.own.isEmpty {
+                        Text("Search's own, which \(Store.name) is built on")
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Palette.muted)
+                            .padding(.bottom, -14)
+                    }
                     ForEach(WhatsNew.notes, id: \.version) { note in
                         version(note)
                     }
@@ -672,18 +730,34 @@ struct ReleaseNotesPanel: View {
         }
     }
 
+    private func own(_ note: WhatsNew.Own) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            heading("\(Store.name) \(note.version)", date: note.date)
+            ForEach(note.paragraphs, id: \.self) { paragraph in
+                Text(paragraph)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func heading(_ title: String, date: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+            if !date.isEmpty {
+                Text(date)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.faint)
+            }
+        }
+    }
+
     private func version(_ note: WhatsNew.Notes) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Search \(note.version)")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
-                if !note.date.isEmpty {
-                    Text(note.date)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Palette.faint)
-                }
-            }
+            heading("Search \(note.version)", date: note.date)
             Text(note.headline)
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.ink)

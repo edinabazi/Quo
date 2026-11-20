@@ -41,4 +41,5 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Fixes
 
+- **Extension badges sit in the middle**: a count was a little low and off to one side, and three or four characters made a wide slab across the icon. Now a circle for one character, a short capsule for more, in a condensed cut for three or four, cut at four as Chrome does. *Nov 2026*
 - **A page from the small window for links keeps its address**: Open in Quo moved it into the row with an empty address bar until it was reloaded, and the small window's own bar never named the site. *Nov 2026*

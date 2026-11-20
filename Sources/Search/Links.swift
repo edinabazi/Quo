@@ -453,17 +453,25 @@ final class Links: NSObject, NSApplicationDelegate {
     static func writeFeedback() {
         // A fork's own page for it (build.sh, SEARCH_FEEDBACK): its issues,
         // in a tab, not an email to the people who made Search.
+        // What build this is goes in, as in the email: a GitHub issue's body,
+        // which a page that doesn't know the field leaves alone.
+        let about = "\(Store.name) \(Updater.version), build \(Updater.build), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
         if let page = Bundle.main.object(forInfoDictionaryKey: "SearchFeedback") as? String, !page.isEmpty,
-           let url = URL(string: page) {
-            MainActor.assumeIsolated { Browsers.ensureWindow().open(url, foreground: true) }
-            return
+           var parts = URLComponents(string: page) {
+            if !(parts.queryItems ?? []).contains(where: { $0.name == "body" }) {
+                parts.queryItems = (parts.queryItems ?? []) + [URLQueryItem(name: "body", value: "\n\n—\n" + about)]
+            }
+            if let url = parts.url {
+                MainActor.assumeIsolated { Browsers.ensureWindow().open(url, foreground: true) }
+                return
+            }
         }
         var text = URLComponents()
         text.scheme = "mailto"
         text.path = "hello@officecommun.com"
         text.queryItems = [
-            URLQueryItem(name: "subject", value: "Search feedback — \(Updater.version) (\(Updater.build))"),
-            URLQueryItem(name: "body", value: "\n\n—\nSearch \(Updater.version), build \(Updater.build), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"),
+            URLQueryItem(name: "subject", value: "\(Store.name) feedback — \(Updater.version) (\(Updater.build))"),
+            URLQueryItem(name: "body", value: "\n\n—\n" + about),
         ]
         guard let url = text.url else { return }
         // With a webmail chosen, its compose page, in a tab of the window in
