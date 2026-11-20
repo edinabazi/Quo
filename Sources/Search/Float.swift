@@ -1246,7 +1246,11 @@ enum Isolate {
         // WebKit's processes a third of a second after everything else, and
         // until then it showed at its old size shrunk with the page, in a
         // part of the window, before growing to fill it.
-        size[0] && size[1] ? [
+        // Not for a live stream (no end to it): YouTube's live player left
+        // the picture at its old size in the window's top corner, a quarter
+        // of it, and never grew it. Sized to the window instead, it is
+        // redrawn at that size a moment after, and stays.
+        size[0] && size[1] && best.duration !== Infinity ? [
           '@supports (scale: calc(100vw / 1px)) {',
           'html.office-floating [data-office-float] {',
           '--office-float-by: min(calc(100vw / ' + shown[0] + 'px), calc(100vh / ' + shown[1] + 'px));',
