@@ -148,6 +148,8 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     }
 
     private let reasons: Set<String>
+    private var look: NSKeyValueObservation?
+    private var macLook: NSObjectProtocol?
 
     private init(context: WKWebExtensionContext, url: URL, reasons: Set<String>, configuration: WKWebViewConfiguration) {
         extensionContext = context
@@ -158,6 +160,28 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         super.init()
         web.navigationDelegate = self
         web.uiDelegate = self
+        // A view with no window never hears the app turn light or dark, so
+        // the page's prefers-color-scheme would stay as it was when it was
+        // made. Hand it the app's look now and on every change, as a page in
+        // a window gets it: an extension that matches its icon to the
+        // toolbar, as Chrome's do from here, then follows on the fly.
+        web.appearance = NSApp.effectiveAppearance
+        look = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] app, _ in
+            MainActor.assumeIsolated { self?.web.appearance = app.effectiveAppearance }
+        }
+        // Set to System, the app is told by the Mac rather than by Settings,
+        // and that turn isn't always heard above: catch it the way Browser
+        // does for sites' icons, a beat after, once it has turned over.
+        macLook = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                MainActor.assumeIsolated {
+                    guard let self, !self.closed else { return }
+                    self.web.appearance = NSApp.effectiveAppearance
+                }
+            }
+        }
     }
 
     private func load() async throws {
@@ -185,6 +209,10 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     private func close(error: Error) {
         guard !closed else { return }
         closed = true
+        look?.invalidate()
+        look = nil
+        if let macLook { DistributedNotificationCenter.default().removeObserver(macLook) }
+        macLook = nil
         if Self.documents[extensionID] === self { Self.documents[extensionID] = nil }
         extensionContext.didCloseTab(self, windowIsClosing: false)
         web.navigationDelegate = nil
