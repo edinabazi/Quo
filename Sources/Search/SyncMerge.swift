@@ -229,6 +229,12 @@ enum SyncItems {
     /// it along untouched. Only a space that isn't Subtle has one.
     static func strengthKey(_ id: UUID) -> String { "strength:" + id.uuidString }
 
+    /// How much grain lies over a space's wash, 0 to 1, an item of its own
+    /// in the same way: a Search from before amounts carries it along
+    /// untouched, and reads the gradient's own grain switch instead. Only a
+    /// space with some grain has one.
+    static func grainKey(_ id: UUID) -> String { "grain:" + id.uuidString }
+
     /// One profile's spaces, as items. Whether a space has sign-ins of its
     /// own is what was agreed when it was first synced (`base`), never
     /// changed after: a store can't change under a space's open tabs.
@@ -241,6 +247,7 @@ enum SyncItems {
             out[spaceKey(space.id)] = SyncMerge.text(synced)
             if let gradient = space.gradient, gradient.usable { out[gradientKey(space.id)] = SyncMerge.text(gradient) }
             if let strength = space.strength, strength != .subtle { out[strengthKey(space.id)] = SyncMerge.text(strength) }
+            if let grain = space.grain, grain.amount > 0 { out[grainKey(space.id)] = SyncMerge.text(grain) }
         }
         if !list.isEmpty { out[spacesOrder] = SyncMerge.text(list.map(\.id.uuidString)) }
         return out
@@ -275,6 +282,7 @@ enum SyncItems {
                 if !local.contains(where: { $0.id == id }) { space.sharesSignIns = synced.sharesSignIns }
                 space.gradient = live[gradientKey(id)].flatMap { SyncMerge.value(SpaceGradient.self, $0) }.flatMap { $0.usable ? $0 : nil }
                 space.strength = live[strengthKey(id)].flatMap(SyncItems.strength).flatMap { $0 == .subtle ? nil : $0 }
+                space.grain = live[grainKey(id)].flatMap(SyncItems.grain).flatMap { $0.amount > 0 ? $0 : nil }
             }
             if space.name.isEmpty { space.name = "Space" }
             return space
@@ -285,6 +293,12 @@ enum SyncItems {
     /// doesn't (a newer Search's), which it then carries along untouched.
     static func strength(_ text: String) -> SpaceStrength? {
         SyncMerge.value(String.self, text).flatMap(SpaceStrength.init(rawValue:))
+    }
+
+    /// A grain item's text as an amount this build knows: a number from 0
+    /// to 1. Anything else is a newer Search's, carried along untouched.
+    static func grain(_ text: String) -> SpaceGrain? {
+        SyncMerge.value(Double.self, text).flatMap { $0.isFinite && (0...1).contains($0) ? SpaceGrain($0) : nil }
     }
 
     // MARK: pins
@@ -405,6 +419,7 @@ enum SyncItems {
         if key.hasPrefix("space:") { return SyncMerge.value(SyncedSpace.self, text) != nil }
         if key.hasPrefix("gradient:") { return SyncMerge.value(SpaceGradient.self, text)?.usable == true }
         if key.hasPrefix("strength:") { return strength(text) != nil }
+        if key.hasPrefix("grain:") { return grain(text) != nil }
         if key.hasPrefix("pin:") { return SyncMerge.value(SyncedPin.self, text) != nil }
         if key.hasPrefix("bm:") { return SyncMerge.value(SyncedBookmark.self, text) != nil }
         if key.hasPrefix("order:") || key.hasPrefix("kids:") { return SyncMerge.value([String].self, text) != nil }

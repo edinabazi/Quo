@@ -631,13 +631,14 @@ struct LittlePlace {
     /// The space's colour or gradient, as the browser's chrome wears it.
     var wash: SpaceLook?
     var strength: SpaceStrength = .subtle
+    var grain: Double = 0
     /// Its spaces, when there's more than one to choose from.
     var spaces: [Space] = []
     var current: UUID?
 
     @MainActor static func of(_ browser: Browser?) -> LittlePlace {
         guard let browser else { return LittlePlace() }
-        return LittlePlace(wash: browser.wash, strength: browser.washStrength,
+        return LittlePlace(wash: browser.wash, strength: browser.washStrength, grain: browser.washGrain,
                            spaces: browser.prefs.usesSpaces ? browser.spaces : [], current: browser.spaceID)
     }
 }
@@ -687,7 +688,9 @@ struct LittleView: View {
         .background {
             ZStack {
                 Palette.frame
-                SpaceWash(look: place.wash).environment(\.washStrength, place.strength)
+                SpaceWash(look: place.wash)
+                    .environment(\.washStrength, place.strength)
+                    .environment(\.washGrain, place.grain)
             }
         }
         .overlay(alignment: .bottom) { if let note { LittleToast(note: note) } }
