@@ -13,6 +13,19 @@ in [ROADMAP.md](ROADMAP.md).
 
 ### Fixed
 
+- Stylus's button opens its popup, and the popup opens its style manager. In 1.0.15 the popup stayed at its first frame ("Toggle styles" and ⚙), so the click seemed to do nothing: Stylus reaches its worker over a port handed to `navigator.serviceWorker`, which got through from 1.0.16 on ([#1258](https://github.com/driceroland/Search/pull/1258)). A probe now checks it with Stylus from the Chrome Web Store: `python3 Tests/extension_stylus.py`. Reported by email
+
+### Held back
+
+Not in this version, kept on main for a later one:
+
+- AI on pages, off unless you turn it on in Settings › AI: Summarize Page and Ask About This Page… in the View menu, answered where you choose — a model downloaded to this Mac (Apple Silicon: Qwen3 1.7B, 1.1 GB, checked before every use and run by a small program of Search's own that can't reach the network or your files), Ollama or LM Studio on this Mac, your own key for Anthropic, OpenAI, Google Gemini or OpenRouter, or signing in with your OpenRouter account. The answer comes in a panel beside the page, in plain text, marked as possibly wrong and with where it ran; follow-up questions stay in the panel, and nothing is kept once it closes. Only the page's visible text goes, never a password, a form or another tab; the page's words are given to the model as something to read, not orders, and any web address, email or phone number in the answer that isn't on the page is pointed out. Keys stay in this Mac's keychain and go only to their provider; a provider off this Mac is shown what it will be sent before the first request, and a private tab uses only what runs on this Mac.
+
+
+## 1.0.16 — 20 November 2026
+
+### Fixed
+
 - Resizing pages no longer flashes a dark strip at a page's edge in dark mode, with the divider between split pages, the window, or the column sliding in or out. WebKit draws a page at its new size a frame or more after its view is resized, and until then the new room showed the web view's own background, dark grey in dark mode, chasing the hand at a white page's edge. While the pages change size, and for half a second after, that room shows the page's own colour instead, as in Safari. Captured frame by frame dragging the divider between two white pages, 28 of 38 frames showed the strip before and none after; resizing the window, 57 of 78 before and none after. The main thread's work per divider move is about the same (0.46 ms median before, 0.51 ms after). Thanks [@jakobbingham](https://github.com/jakobbingham) ([#1250](https://github.com/driceroland/Search/pull/1250))
 - Settings, History or another of Search's own pages beside a web page follows the divider as it is dragged. It kept its old width until the button came up, leaving the window's ground between it and the divider, or was cut off by it. The stage now tells such a page where it is as it lays out, and only when one is in the pair: two web pages work as they did. Thanks [@jakobbingham](https://github.com/jakobbingham) ([#1251](https://github.com/driceroland/Search/pull/1251))
 - Zotero Connector starts: its button saves the page to Zotero and its settings show, where the button did nothing and Settings was empty ([#1236](https://github.com/driceroland/Search/issues/1236)). An extension's page that hands its worker a port, through `navigator.serviceWorker.ready` as Chrome's documentation shows or through `controller`, now reaches the worker, and the worker hears what the page says on that port, where only the worker's side got through. Zotero still saves a page as a web page rather than reading it with its translators. `python3 Tests/extension_worker_ports.py`. Thanks [@fuoar](https://github.com/fuoar) ([#1258](https://github.com/driceroland/Search/pull/1258))
