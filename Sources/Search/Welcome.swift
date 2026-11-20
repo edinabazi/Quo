@@ -34,6 +34,20 @@ struct WelcomePanel: View {
     @State private var wantsPasswords = true
     @State private var wantsHistory = true
     @State private var wantsBookmarks = true
+    /// Each of its profiles into a profile of its own here (see takeProfiles).
+    @State private var wantsProfiles = true
+    /// Its store extensions, fresh from the Chrome Web Store, each asked about.
+    @State private var wantsExtensions = true
+    /// What is on this Mac, found once off the main thread: the browsers
+    /// there is something to read in, and those macOS keeps from this app.
+    @State private var found: [ImportSource]?
+    @State private var refused: [Chromium.Unavailable] = []
+    @State private var allowTrouble: String?
+    /// What each holds, by browser and profile ("" for all of them).
+    @State private var previews: [String: ImportSource.Preview] = [:]
+    /// Each browser's profiles and the one it used last, read with the rest.
+    @State private var profileLists: [String: [ImportSource.Profile]] = [:]
+    @State private var usual: [String: String] = [:]
     @State private var bringing = false
     @State private var brought: String?
     /// Arc's spaces and pins, brought over once this is done: Bring Things
@@ -224,9 +238,10 @@ struct WelcomePanel: View {
     // MARK: - 3. bring your things
 
     private var bring: some View {
-        let sources = ImportSource.installed()
+        let sources = found ?? []
         let chosen = source ?? sources.first
         let arcHere = FileManager.default.fileExists(atPath: Arc.file.path)
+        let preview = chosen.flatMap { previews[previewKey($0)] }
         return VStack(alignment: .leading, spacing: 20) {
             Heading("Bring your things.", "Nothing in the other browser changes, and nothing leaves your Mac.")
                 .rise(0)
@@ -261,21 +276,40 @@ struct WelcomePanel: View {
                                 .foregroundStyle(.white.opacity(0.6))
                             if sources.count > 1 {
                                 Chips(options: sources.prefix(4).map { ($0, $0.name, nil) },
-                                      selection: Binding(get: { chosen }, set: { source = $0; brought = nil }))
+                                      selection: Binding(get: { chosen }, set: { source = $0; brought = nil; count($0) }))
                             }
                             Spacer()
                         }
                         if chosen.importsPasswords {
-                            Toggled("Passwords", "Into your Mac's keychain; macOS asks once", on: $wantsPasswords)
+                            Toggled("Passwords", counted(preview?.passwords, "Into your Mac's keychain; macOS asks once"), on: $wantsPasswords)
                         }
-                        Toggled("Bookmarks", "Folders and all", on: $wantsBookmarks)
-                        Toggled("History", "So the address field already knows where you go", on: $wantsHistory)
+                        Toggled("Bookmarks", counted(preview?.bookmarks, "Folders and all"), on: $wantsBookmarks)
+                        Toggled("History", counted(preview?.places, "So the address field already knows where you go"), on: $wantsHistory)
+                        if let list = profileLists[chosen.id], list.count > 1 {
+                            Toggled("Profiles", "\(list.count) — \(ListFormatter.localizedString(byJoining: list.map(\.name))), each its own profile here with its own bookmarks and history",
+                                    on: Binding(get: { wantsProfiles }, set: { wantsProfiles = $0; brought = nil; count(chosen) }))
+                        }
+                        let fresh = freshExtensions(preview)
+                        if !fresh.isEmpty {
+                            Toggled("Extensions", "\(fresh.count) — \(ImportSource.Addon.names(fresh)), fresh from the Chrome Web Store; you say yes to each",
+                                    on: $wantsExtensions)
+                        }
+                        if let left = preview?.leftBehind, !left.isEmpty {
+                            Text(left.allSatisfy(\.lookFor)
+                                 ? "\(chosen.name)'s add-ons can't run here: \(ImportSource.Addon.names(left, first: 4)). Look for them in the Chrome Web Store."
+                                 : "Can't come over: " + left.prefix(4).map { "\($0.name) (\($0.skip ?? ""))" }.joined(separator: ", ")
+                                    + (left.count > 4 ? " and \(left.count - 4) more — see Settings › Bring Things Over" : ""))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.45))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         HStack(spacing: 12) {
                             if let brought {
                                 Done(brought)
                             } else {
                                 Primary(bringing ? "Bringing…" : "Bring Them In") { bringAll(from: chosen) }
-                                    .disabled(bringing || !((chosen.importsPasswords && wantsPasswords) || wantsHistory || wantsBookmarks))
+                                    .disabled(bringing || !((chosen.importsPasswords && wantsPasswords) || wantsHistory || wantsBookmarks
+                                                            || (wantsExtensions && !fresh.isEmpty)))
                                 if bringing { ProgressView().controlSize(.small) }
                             }
                         }
@@ -283,7 +317,40 @@ struct WelcomePanel: View {
                     }
                 }
                 .rise(arcHere ? 2 : 1)
-            } else if !arcHere {
+            }
+            // Here, but kept from this app by macOS: said by name with the
+            // way to allow it, never "no other browser".
+            if !refused.isEmpty {
+                Glass {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(refused.indices, id: \.self) { index in
+                            let missing = refused[index]
+                            HStack(spacing: 16) {
+                                Badge(symbol: "lock.fill")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(missing.source.name) is on this Mac")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                    Text("macOS keeps its data from other apps until you allow \(Store.name) to read it.")
+                                        .font(.system(size: 12.5))
+                                        .foregroundStyle(.white.opacity(0.6))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 8)
+                                Primary("Allow Access…") { allow(missing.source) }
+                            }
+                        }
+                        if let allowTrouble {
+                            Text(allowTrouble)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .rise(arcHere || chosen != nil ? 3 : 1)
+            }
+            if found != nil, chosen == nil, refused.isEmpty, !arcHere {
                 Glass {
                     Text("No other browser found on this Mac, so there's nothing to bring. You can always bring a file another browser exported, from File › Bring Things Over.")
                         .font(.system(size: 13.5))
@@ -292,6 +359,72 @@ struct WelcomePanel: View {
                 }
                 .rise(1)
             }
+        }
+        .onAppear { if found == nil { look() } }
+    }
+
+    /// "312 — Folders and all", or the words alone while counting.
+    private func counted(_ n: Int?, _ detail: String) -> String {
+        guard let n else { return detail }
+        return n == 0 ? "None — \(detail.prefix(1).lowercased() + detail.dropFirst())" : "\(n.formatted()) — \(detail)"
+    }
+
+    /// Every profile, each into its own, or the one used most recently.
+    private func eachProfile(_ source: ImportSource) -> Bool {
+        wantsProfiles && (profileLists[source.id]?.count ?? 0) > 1
+    }
+
+    /// The profile read: nil for every one.
+    private func profile(of source: ImportSource) -> String? {
+        eachProfile(source) ? nil : usual[source.id]
+    }
+
+    private func previewKey(_ source: ImportSource) -> String {
+        "\(source.id)/\(profile(of: source) ?? "")"
+    }
+
+    private func freshExtensions(_ preview: ImportSource.Preview?) -> [ImportSource.Addon] {
+        guard #available(macOS 15.4, *), let preview else { return [] }
+        return ExtensionImport.fresh(preview.addons)
+    }
+
+    /// The browsers on this Mac, found off the main thread, and the first counted.
+    private func look() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (readable, missing) = Chromium.present()
+            let sources = readable.map(ImportSource.chromium) + Mozilla.installed().map(ImportSource.mozilla)
+            let lists = sources.map { ($0.id, $0.profiles, $0.usual) }
+            DispatchQueue.main.async {
+                for (id, list, last) in lists {
+                    profileLists[id] = list
+                    usual[id] = last
+                }
+                found = sources
+                refused = missing
+                if let first = source ?? sources.first { count(first) }
+            }
+        }
+    }
+
+    private func count(_ source: ImportSource) {
+        let key = previewKey(source)
+        guard previews[key] == nil else { return }
+        let profile = profile(of: source)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let preview = source.preview(profile: profile)
+            DispatchQueue.main.async { previews[key] = preview }
+        }
+    }
+
+    /// The system's folder panel, opened at the browser's data; allowed, it
+    /// joins the others and is picked.
+    private func allow(_ browser: Chromium.Source) {
+        Chromium.ask(for: browser) { trouble in
+            allowTrouble = trouble
+            guard trouble == nil else { return }
+            source = .chromium(browser)
+            brought = nil
+            look()
         }
     }
 
@@ -457,7 +590,9 @@ struct WelcomePanel: View {
     // MARK: - doing
 
     private func bringAll(from source: ImportSource) {
-        let profile = source.usual
+        let each = eachProfile(source)
+        let profile = profile(of: source)
+        let extensions = wantsExtensions ? freshExtensions(previews[previewKey(source)]) : []
         bringing = true
         var lines: [String] = []
         let group = DispatchGroup()
@@ -480,14 +615,35 @@ struct WelcomePanel: View {
                 }
             }
         }
-        if wantsBookmarks {
-            lines.append("\(browser.takeBookmarks(from: source, profile: profile).added) bookmarks")
-        }
-        if wantsHistory {
+        if each, wantsBookmarks || wantsHistory {
             group.enter()
-            browser.takePlaces(from: source, profile: profile) { count in
-                lines.append("\(count) places")
+            browser.takeProfiles(from: source, bookmarks: wantsBookmarks, history: wantsHistory) { takes in
+                let marks = takes.reduce(0) { $0 + $1.bookmarks }
+                let places = takes.reduce(0) { $0 + $1.places }
+                let made = takes.filter(\.made).count
+                if wantsBookmarks { lines.append("\(marks) bookmarks") }
+                if wantsHistory { lines.append("\(places) places") }
+                if made > 0 { lines.append(made == 1 ? "1 new profile" : "\(made) new profiles") }
                 group.leave()
+            }
+        } else {
+            if wantsBookmarks {
+                lines.append("\(browser.takeBookmarks(from: source, profile: profile).added) bookmarks")
+            }
+            if wantsHistory {
+                group.enter()
+                browser.takePlaces(from: source, profile: profile) { count in
+                    lines.append("\(count) places")
+                    group.leave()
+                }
+            }
+        }
+        if #available(macOS 15.4, *), !extensions.isEmpty {
+            // Asked about one at a time; the step can be left meanwhile.
+            lines.append(extensions.count == 1 ? "1 extension to confirm" : "\(extensions.count) extensions to confirm")
+            Task { @MainActor in
+                let result = await ExtensionImport.install(extensions)
+                browser.announce(result.said)
             }
         }
         group.notify(queue: .main) {

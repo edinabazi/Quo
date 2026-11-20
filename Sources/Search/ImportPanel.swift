@@ -29,7 +29,14 @@ struct ImportPanel: View {
     @State private var wantsPasswords = true
     @State private var wantsBookmarks = true
     @State private var wantsHistory = true
-    @State private var wantsExtensions = false
+    /// Store extensions, fresh from the Chrome Web Store, each asked about.
+    @State private var wantsExtensions = true
+    /// Every profile of the browser into a profile of its own here, where
+    /// it has more than one (see takeProfiles).
+    @State private var wantsProfiles = true
+    /// Safari's extensions, which can't come: named so one like each can be
+    /// found (see safariAddons).
+    @State private var safariAddons: [ImportSource.Addon] = []
     /// A Chromium browser's open tabs and tab groups (see takeSession).
     /// Off unless asked for.
     @State private var wantsTabs = false
@@ -66,7 +73,7 @@ struct ImportPanel: View {
                     Text("Looking on this Mac…").font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
             } else if sources.isEmpty {
-                Card { Nothing(unreadable.isEmpty ? "No other browser found on this Mac." : "Choose a browser's data folder below to allow \(Store.name) to read it.") }
+                Card { Nothing(unreadable.isEmpty ? "No other browser found on this Mac." : "Allow \(Store.name) to read a browser's data below to bring things from it.") }
             } else {
                 Caption("On this Mac")
                 Card {
@@ -218,13 +225,25 @@ struct ImportPanel: View {
                     Text("Safari — macOS keeps its data from other apps: in Safari, File › Export Browsing Data, then bring the file in below.")
                         .font(.system(size: 11.5))
                         .foregroundStyle(Palette.faint)
+                    if !safariAddons.isEmpty {
+                        Text("Safari's extensions can't come over: \(ImportSource.Addon.names(safariAddons, first: 6)). Most have a Chrome Web Store version — look for each there.")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Palette.faint)
+                    }
                 }
                 ForEach(unreadable.indices, id: \.self) { index in
                     let missing = unreadable[index]
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(missing.message)
                         Spacer(minLength: 4)
-                        Pill("Choose folder…") { chooseFolder(for: missing.source) }
+                        Pill("Allow Access…") { chooseFolder(for: missing.source) }
+                    }
+                }
+                if !unreadable.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("Allowed here, it is for this session. For good, give \(Store.name) Full Disk Access.")
+                        Spacer(minLength: 4)
+                        Pill("Privacy Settings…") { NSWorkspace.shared.open(Chromium.fullDiskAccess) }
                     }
                 }
                 if let folderError {
@@ -243,34 +262,14 @@ struct ImportPanel: View {
     /// macOS protects another app's data. Choosing its folder in the system
     /// panel grants this browser access without asking for Full Disk Access.
     private func chooseFolder(for source: Chromium.Source) {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = source.root.deletingLastPathComponent()
-        panel.message = "Choose \(source.name)'s browser data folder"
-        panel.prompt = "Use Folder"
-        panel.begin { answer in
-            guard answer == .OK, let folder = panel.url else { return }
+        Chromium.ask(for: source) { trouble in
+            folderError = trouble
+            guard trouble == nil else { return }
             looking = true
-            DispatchQueue.global(qos: .userInitiated).async {
-                var selected = source
-                selected.rootOverride = folder.resolvingSymlinksInPath()
-                let found = !selected.profiles.isEmpty
-                DispatchQueue.main.async {
-                    guard found else {
-                        looking = false
-                        folderError = "No browser profile was found in \(folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")). Choose the folder that contains Default or Profile 1."
-                        return
-                    }
-                    Chromium.useForSession(folder, for: source)
-                    folderError = nil
-                    previews = [:]
-                    profiles = [:]
-                    usual = [:]
-                    look()
-                }
-            }
+            previews = [:]
+            profiles = [:]
+            usual = [:]
+            look()
         }
     }
 
@@ -291,6 +290,20 @@ struct ImportPanel: View {
                 Rule()
             }
             if let choices = profiles[source.id], choices.count > 1 {
+                // Each of its profiles into one of its own here, or one of
+                // them (or all run together) into this window's.
+                Line("Profiles", eachProfile(source)
+                     ? "\(choices.count) — \(ListFormatter.localizedString(byJoining: choices.map(\.name))) — each into a profile of the same name here, with its own bookmarks and history"
+                     : "Into this window's profile: the one chosen below") {
+                    Switch(on: Binding(get: { wantsProfiles }, set: { on in
+                        wantsProfiles = on
+                        brought = nil
+                        count(source)
+                    }))
+                }
+                Rule()
+            }
+            if let choices = profiles[source.id], choices.count > 1, !eachProfile(source) {
                 Line("Profile") {
                     Picker("", selection: Binding(
                         get: { chosen[source.id] ?? usual[source.id] ?? "" },
@@ -380,11 +393,56 @@ struct ImportPanel: View {
             }
             if !extensions.isEmpty {
                 Rule()
-                Line("Extensions", "\(extensions.count) found — installed fresh from the Chrome Web Store, you say yes to each one") {
+                Line("Extensions · \(extensions.count)", "\(ImportSource.Addon.names(extensions)) — installed fresh from the Chrome Web Store, you say yes to each one") {
                     Switch(on: $wantsExtensions)
                 }
+            } else if let preview, preview.addons.contains(where: \.comes) {
+                Rule()
+                if #available(macOS 15.4, *) {
+                    Line("Extensions", "All of \(source.name)'s are here already") {
+                        option($wantsExtensions, none: true)
+                    }
+                } else {
+                    Line("Extensions", "They need macOS 15.4 or later") {
+                        option($wantsExtensions, none: true)
+                    }
+                }
+            }
+            // What can't come, and why: themes, ones turned off, Firefox's.
+            if let left = preview?.leftBehind, !left.isEmpty {
+                Rule()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(left.allSatisfy(\.lookFor) ? "\(source.name)'s add-ons can't run here" : "Can't come over")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.ink)
+                    ForEach(left.prefix(12)) { addon in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("\(addon.name) — \(addon.skip ?? "")")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Palette.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 4)
+                            if addon.lookFor, let search = addon.search {
+                                Pill("Find") { browser.open(search, foreground: true) }
+                            }
+                        }
+                    }
+                    if left.count > 12 {
+                        Text("and \(left.count - 12) more")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Palette.faint)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
             }
         }
+    }
+
+    /// Whether every profile comes, each into its own here: asked for, and
+    /// there being more than one.
+    private func eachProfile(_ source: ImportSource) -> Bool {
+        wantsProfiles && (profiles[source.id]?.count ?? 0) > 1
     }
 
     // MARK: - counting
@@ -396,6 +454,7 @@ struct ImportPanel: View {
     /// The profile to read: the one chosen, or the one used most recently;
     /// nil for all of them.
     private func profile(of source: ImportSource) -> String? {
+        if eachProfile(source) { return nil }
         let id = chosen[source.id] ?? usual[source.id] ?? ""
         return id.isEmpty ? nil : id
     }
@@ -409,6 +468,7 @@ struct ImportPanel: View {
         for (n, one) in [(preview.bookmarks, "bookmark"), (preview.places, "place"), (preview.passwords, "password")] where n > 0 {
             parts.append(count(n, one))
         }
+        if !preview.extensions.isEmpty { parts.append(count(preview.extensions.count, "extension")) }
         if preview.session.found > 0 { parts.append(count(preview.session.found, "open tab")) }
         if let arc = arcCounts[key(source, profile(of: source))], arc.spaces > 0 {
             parts.append(count(arc.spaces, "space"))
@@ -441,10 +501,9 @@ struct ImportPanel: View {
     }
 
     /// The store extensions it has that aren't here already.
-    private func fresh(_ source: ImportSource) -> [String] {
+    private func fresh(_ source: ImportSource) -> [ImportSource.Addon] {
         guard #available(macOS 15.4, *), let preview = previews[key(source, profile(of: source))] else { return [] }
-        let have = Set(Extensions.shared.installed.map(\.id))
-        return preview.extensions.filter { !have.contains($0) }
+        return ExtensionImport.fresh(preview.addons)
     }
 
     /// Every browser on this Mac, its profiles and what each holds, found
@@ -452,12 +511,14 @@ struct ImportPanel: View {
     private func look() {
         let wanted = browser.bringingIn ?? ""
         DispatchQueue.global(qos: .userInitiated).async {
-            let found = ImportSource.installed()
-            let missing = Chromium.unreadable()
+            let (readable, missing) = Chromium.present()
+            let found = readable.map(ImportSource.chromium) + Mozilla.installed().map(ImportSource.mozilla)
             let lists = found.map { ($0.id, $0.profiles, $0.usual) }
+            let safari = ImportSource.safariAddons()
             DispatchQueue.main.async {
                 sources = found
                 unreadable = missing
+                safariAddons = safari
                 for (id, list, most) in lists {
                     profiles[id] = list
                     usual[id] = most
@@ -529,7 +590,15 @@ struct ImportPanel: View {
                 }
             }
         }
-        if marks {
+        if eachProfile(source), marks || places {
+            // Each profile into its own here: bookmarks and history together.
+            group.enter()
+            browser.takeProfiles(from: source, bookmarks: marks, history: places, replacing: replaceBookmarks) { takes in
+                marksLanded = takes.contains { $0.bookmarks + $0.already > 0 }
+                said[1] = Said(ok: true, text: takes.isEmpty ? "No bookmarks or history in \(source.name)'s profiles" : Browser.said(takes))
+                group.leave()
+            }
+        } else if marks {
             let (added, already, kept) = browser.takeBookmarks(from: source, profile: profile, replacing: replaceBookmarks)
             marksLanded = added + already > 0
             said[1] = kept
@@ -538,7 +607,7 @@ struct ImportPanel: View {
                            : already == 0 ? "\(added.formatted()) bookmarks"
                            : "\(added.formatted()) new bookmarks, \(already.formatted()) already here")
         }
-        if places {
+        if places, !eachProfile(source) {
             group.enter()
             browser.takePlaces(from: source, profile: profile) { count in
                 said[2] = Said(ok: true, text: "\(count.formatted()) places")
@@ -546,9 +615,19 @@ struct ImportPanel: View {
             }
         }
         if #available(macOS 15.4, *), !extensions.isEmpty {
-            // Each from the store, fresh and checked, one question at a time.
-            Task { for id in extensions { await Extensions.shared.install(id: id) } }
-            said[3] = Said(ok: true, text: extensions.count == 1 ? "1 extension to confirm" : "\(extensions.count) extensions to confirm")
+            // Each from the store, fresh and checked, one question at a time;
+            // the line says what came of them once every one is answered.
+            let pending = Said(ok: true, text: extensions.count == 1 ? "1 extension to confirm" : "\(extensions.count) extensions to confirm, one at a time")
+            said[3] = pending
+            Task { @MainActor in
+                let result = await ExtensionImport.install(extensions)
+                let done = Said(ok: result.failed.isEmpty, text: result.said)
+                said[3] = done
+                if var list = brought, let at = list.firstIndex(of: pending) {
+                    list[at] = done
+                    brought = list
+                }
+            }
         }
         if wantsArc, arcCounts[key(source, profile)] != nil, let sidebar = source.arcSidebar(profile: profile) {
             let (spaces, pins, tabs) = browser.takeArc(sidebar, from: source, profile: profile)

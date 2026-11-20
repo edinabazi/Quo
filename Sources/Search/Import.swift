@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Security
 import SQLite3
@@ -211,15 +212,15 @@ enum Chromium {
                 let reason = Self.permissionDenied(failure)
                     ? "macOS hasn't allowed \(Store.name) to read all of them."
                     : failure.localizedDescription
-                return "Some of \(source.name)'s profiles in \(looked) couldn't be read: \(reason) Choose its data folder in Settings › Bring Things Over to allow access for this session."
+                return "Some of \(source.name)'s profiles in \(looked) couldn't be read: \(reason) Allow access to its data folder to bring them too."
             }
             if Self.permissionDenied(failure) {
-                return "macOS hasn't allowed \(Store.name) to read \(source.name)'s data in \(looked). Choose its data folder in Settings › Bring Things Over to allow access for this session."
+                return "\(source.name) is on this Mac, but macOS keeps its data in \(looked) from other apps until you allow \(Store.name) to read it."
             }
             return "\(Store.name) couldn't read \(source.name)'s data in \(looked): \(failure.localizedDescription)"
         }
 
-        private static func permissionDenied(_ error: NSError) -> Bool {
+        static func permissionDenied(_ error: NSError) -> Bool {
             if error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoPermissionError { return true }
             if error.domain == NSPOSIXErrorDomain && [Int(EACCES), Int(EPERM)].contains(error.code) { return true }
             if let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError {
@@ -230,14 +231,70 @@ enum Chromium {
     }
 
     /// Keep read failures visible even when another profile can be imported.
+    /// A test run looks only at its own made-up folders, never at which
+    /// apps are really in /Applications.
     static func unreadable() -> [Unavailable] {
-        guard !Store.testing else { return [] }
-        return known.filter(\.appInstalled).compactMap { source in
+        unreadable(among: known, installed: Store.testing ? { _ in false } : { $0.appInstalled })
+    }
+
+    /// Every browser here whose data can't all be read: the app is on this
+    /// Mac with nothing found where its data goes, or its data folder is
+    /// there and macOS won't let it be read. macOS keeps some browsers'
+    /// folders from other apps — Chrome's, on recent macOS — until the
+    /// person allows it, and such a browser is on this Mac however it was
+    /// installed, wherever its app is: refused is not missing. Left out, a
+    /// Mac with only Chrome was told it had no other browser at all.
+    static func unreadable(among sources: [Source], installed: (Source) -> Bool) -> [Unavailable] {
+        sources.compactMap { source in
             let discovery = source.discovery
             guard discovery.profiles.isEmpty || discovery.error != nil else { return nil }
+            let refused = discovery.error.map { Unavailable.permissionDenied($0 as NSError) } ?? false
+            guard refused || installed(source) else { return nil }
             return Unavailable(source: source, error: discovery.error, partial: !discovery.profiles.isEmpty)
         }
     }
+
+    /// What there is to bring from, and what is here but kept from this
+    /// app: one look, for the sheet and the Welcome alike.
+    static func present() -> (readable: [Source], refused: [Unavailable]) {
+        (installed(), unreadable())
+    }
+
+    /// Asks for a browser's data folder in the system's own panel, which is
+    /// how macOS lets another app's folder be read without Full Disk Access:
+    /// opened in the folder itself, so Allow is the one click it takes.
+    /// Kept for this session only (see useForSession). `done` gets nil once
+    /// a profile is found there, or what to say otherwise.
+    @MainActor
+    static func ask(for source: Source, done: @escaping (String?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = source.root
+        panel.message = "To let \(Store.name) read \(source.name)'s bookmarks, history and extensions, choose its data folder — this one — and click Allow."
+        panel.prompt = "Allow"
+        panel.begin { answer in
+            guard answer == .OK, let folder = panel.url else { return }
+            DispatchQueue.global(qos: .userInitiated).async {
+                var selected = source
+                selected.rootOverride = folder.resolvingSymlinksInPath()
+                let found = !selected.profiles.isEmpty
+                DispatchQueue.main.async {
+                    guard found else {
+                        done("No browser profile was found in \(folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")). Choose the folder that contains Default or Profile 1.")
+                        return
+                    }
+                    useForSession(folder, for: source)
+                    done(nil)
+                }
+            }
+        }
+    }
+
+    /// Settings › Privacy & Security › Full Disk Access, for a browser to be
+    /// readable every time rather than for this session.
+    static let fullDiskAccess = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 
     enum Trouble: Error {
         case noPassphrase
@@ -488,7 +545,7 @@ enum Chromium {
             bookmarks: Bookmarks.count(bookmarks(in: source, profile: profile)),
             places: min(limit, places),
             passwords: passwords,
-            extensions: extensions(in: source, profile: profile),
+            addons: addons(in: source, profile: profile),
             session: sessions(in: source, profile: profile)
         )
     }
@@ -508,14 +565,21 @@ enum Chromium {
     }
 
     /// The extensions a profile has from the Chrome Web Store, by id, to be
-    /// installed fresh from the store — never copied from here. Its
-    /// Preferences and Secure Preferences say where each came from: only
-    /// ones the person added from the store count, not ones built in,
-    /// loaded unpacked, put there by a policy or by the browser itself, nor
-    /// themes. A profile without either file has only its Extensions/
-    /// folders to go by.
+    /// installed fresh from the store — never copied from here.
     static func extensions(in source: Source, profile: String?) -> [String] {
-        var out: [String] = []
+        addons(in: source, profile: profile).filter(\.comes).map(\.id)
+    }
+
+    /// Every extension a profile has, or every profile, each with its name
+    /// and whether it can come: only ones the person added that the Chrome
+    /// Web Store has, and that are on, are installed fresh from the store.
+    /// Its Preferences and Secure Preferences say where each came from; a
+    /// profile with neither file has only its Extensions/ folders to go by.
+    /// What can't come says why: a theme, one built in, one loaded from a
+    /// folder, put there by a policy, turned off, or from another store.
+    static func addons(in source: Source, profile: String?) -> [ImportSource.Addon] {
+        var out: [ImportSource.Addon] = []
+        var seen = Set<String>()
         for folder in source.profiles(only: profile) {
             var settings: [String: [String: Any]] = [:]
             for name in ["Preferences", "Secure Preferences"] {
@@ -528,30 +592,117 @@ enum Chromium {
                     settings[id, default: [:]].merge(entry) { kept, _ in kept }
                 }
             }
-            var ids: [String]
-            if settings.isEmpty {
-                guard let extensions = source.file("Extensions", in: folder) else { continue }
-                ids = (try? FileManager.default.contentsOfDirectory(atPath: extensions.path)) ?? []
-            } else {
-                ids = settings.compactMap { id, entry in
-                    // Location 1 is Chromium's "internal": added by the person.
-                    guard entry["location"] as? Int == 1 || entry["from_webstore"] as? Bool == true,
-                          entry["was_installed_by_default"] as? Bool != true,
-                          entry["was_installed_by_oem"] as? Bool != true
-                    else { return nil }
-                    let manifest = entry["manifest"] as? [String: Any] ?? [:]
-                    guard manifest["theme"] == nil else { return nil }
-                    // From another store, Edge's say: not the Chrome Web Store's to give.
-                    if let update = manifest["update_url"] as? String {
-                        let host = URL(string: update)?.host()?.lowercased() ?? ""
-                        guard host == "google.com" || host.hasSuffix(".google.com") else { return nil }
-                    }
-                    return id
-                }
+            let onDisk = source.file("Extensions", in: folder)
+                .flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) }?
+                .filter(isStoreID) ?? []
+            // Without settings, every folder is one the person added.
+            let ids = settings.isEmpty ? onDisk : Array(settings.keys)
+            for id in ids.sorted() where safeID(id) && !seen.contains(id) {
+                guard let addon = addon(id, settings[id] ?? [:], hasSettings: !settings.isEmpty,
+                                        onDisk: onDisk.contains(id), in: folder, of: source) else { continue }
+                seen.insert(id)
+                out.append(addon)
             }
-            for id in ids.sorted() where isStoreID(id) && !out.contains(id) { out.append(id) }
         }
-        return out
+        return out.sorted { a, b in
+            a.comes != b.comes ? a.comes : a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+
+    /// One extension, from its entry in the profile's settings and the
+    /// manifest it was installed with. Nil for an entry that says nothing
+    /// of where it came from and has no folder: a leftover, not an extension.
+    private static func addon(_ id: String, _ entry: [String: Any], hasSettings: Bool, onDisk: Bool,
+                              in folder: URL, of source: Source) -> ImportSource.Addon? {
+        let location = entry["location"] as? Int
+        let fromStore = entry["from_webstore"] as? Bool == true
+        guard location != nil || fromStore || onDisk else { return nil }
+        let installed = installedManifest(id, version: (entry["manifest"] as? [String: Any])?["version"] as? String,
+                                          in: folder, of: source)
+        let manifest = (entry["manifest"] as? [String: Any]).flatMap { $0.isEmpty ? nil : $0 } ?? installed?.manifest ?? [:]
+        let raw = manifest["name"] as? String ?? ""
+        let name = localized(raw, installed: installed?.folder, manifest: manifest, of: source) ?? id
+        let version = manifest["version"] as? String ?? ""
+        func skip(_ why: String, builtIn: Bool = false) -> ImportSource.Addon {
+            ImportSource.Addon(id: id, name: name, version: version, skip: why, builtIn: builtIn)
+        }
+        // Chromium's locations: 1 added by the person, 2, 3 and 6 by another
+        // app on this Mac, 4 and 8 loaded from a folder, 5 and 10 the
+        // browser's own, 7 and 9 put there by a policy.
+        switch location {
+        case 5, 10: return skip("built into \(source.name)", builtIn: true)
+        case 4, 8: return skip("loaded from a folder, not a store — load that folder in Settings › Extensions")
+        case 7, 9: return skip("put there by a policy")
+        default: break
+        }
+        if entry["was_installed_by_default"] as? Bool == true || entry["was_installed_by_oem"] as? Bool == true {
+            return skip("came with \(source.name)", builtIn: true)
+        }
+        if manifest["theme"] != nil { return skip("a theme") }
+        if manifest["app"] != nil { return skip("an app, not an extension") }
+        if disabled(entry) { return skip("turned off in \(source.name)") }
+        // From another store, Edge's say: not the Chrome Web Store's to give.
+        if let update = manifest["update_url"] as? String {
+            let host = URL(string: update)?.host()?.lowercased() ?? ""
+            guard host == "google.com" || host.hasSuffix(".google.com") else {
+                return skip("from \(host.isEmpty ? "another store" : host), not the Chrome Web Store")
+            }
+        } else if !fromStore, hasSettings, location != 1 {
+            return skip("not from the Chrome Web Store")
+        }
+        guard isStoreID(id) else { return skip("not from the Chrome Web Store") }
+        return ImportSource.Addon(id: id, name: name, version: version, skip: nil)
+    }
+
+    /// Off in the other browser: "state" 0 in older Chromium, a reason to
+    /// be disabled in newer.
+    private static func disabled(_ entry: [String: Any]) -> Bool {
+        if entry["state"] as? Int == 0 { return true }
+        if let reasons = entry["disable_reasons"] as? Int { return reasons != 0 }
+        if let reasons = entry["disable_reasons"] as? [Any] { return !reasons.isEmpty }
+        return false
+    }
+
+    /// The manifest of the version installed in the profile's Extensions/
+    /// folder: the one the settings name, or else the newest there.
+    private static func installedManifest(_ id: String, version: String?, in folder: URL, of source: Source)
+        -> (manifest: [String: Any], folder: String)? {
+        guard let base = source.file("Extensions/\(id)", in: folder),
+              let versions = try? FileManager.default.contentsOfDirectory(atPath: base.path)
+        else { return nil }
+        let candidates = versions.filter { !$0.hasPrefix(".") && !$0.contains("/") }
+            .sorted { $0.localizedStandardCompare($1) == .orderedDescending }
+        let pick = candidates.first { version != nil && ($0 == version || $0.hasPrefix(version! + "_")) } ?? candidates.first
+        guard let pick, let data = try? source.data("Extensions/\(id)/\(pick)/manifest.json", in: folder),
+              let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return (manifest, folder.appendingPathComponent("Extensions/\(id)/\(pick)").path)
+    }
+
+    /// A name as the extension spells it: "__MSG_appName__" looked up in
+    /// its own _locales, in this Mac's language or its default one. Nil
+    /// when there is no name to give.
+    private static func localized(_ raw: String, installed: String?, manifest: [String: Any], of source: Source) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("__MSG_"), trimmed.hasSuffix("__") else { return trimmed.isEmpty ? nil : trimmed }
+        let key = String(trimmed.dropFirst(6).dropLast(2)).lowercased()
+        guard let installed else { return nil }
+        let languages = [Locale.current.language.languageCode?.identifier, manifest["default_locale"] as? String, "en"].compactMap { $0 }
+        for language in languages where language.allSatisfy({ $0.isLetter || $0 == "_" || $0 == "-" }) {
+            let file = URL(fileURLWithPath: installed).appendingPathComponent("_locales/\(language)/messages.json")
+            guard let data = try? ImportRead.data(file, inside: source.root.resolvingSymlinksInPath()),
+                  let messages = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+            for (name, value) in messages where name.lowercased() == key {
+                if let text = (value as? [String: Any])?["message"] as? String, !text.isEmpty { return text }
+            }
+        }
+        return nil
+    }
+
+    /// Safe to put in a path: letters and digits only.
+    private static func safeID(_ text: String) -> Bool {
+        !text.isEmpty && text.count <= 64 && text.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
     }
 
     /// Thirty-two letters from a to p: the shape of a store extension's id.
@@ -1100,8 +1251,38 @@ enum Mozilla {
         return ImportSource.Preview(
             bookmarks: Bookmarks.count(bookmarks(in: source, profile: profile)),
             places: min(limit, places),
-            passwords: passwords
+            passwords: passwords,
+            addons: addons(in: source, profile: profile)
         )
+    }
+
+    /// The add-ons a profile has, from its extensions.json: only extensions
+    /// the person added that are on — not themes, dictionaries or the ones
+    /// Firefox comes with. None of them can run here; they are listed so
+    /// one like each can be found in the Chrome Web Store.
+    static func addons(in source: Source, profile: String?) -> [ImportSource.Addon] {
+        var out: [ImportSource.Addon] = []
+        var seen = Set<String>()
+        for file in source.files(only: profile) {
+            let list = file.deletingLastPathComponent().appendingPathComponent("extensions.json")
+            guard let data = try? Data(contentsOf: list), data.count < 64 * 1024 * 1024,
+                  let top = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let addons = top["addons"] as? [[String: Any]]
+            else { continue }
+            for addon in addons {
+                guard let id = addon["id"] as? String, addon["type"] as? String == "extension",
+                      addon["location"] as? String == "app-profile",
+                      addon["active"] as? Bool != false, addon["userDisabled"] as? Bool != true,
+                      addon["visible"] as? Bool != false,
+                      seen.insert(id).inserted
+                else { continue }
+                let name = (addon["defaultLocale"] as? [String: Any])?["name"] as? String ?? id
+                out.append(ImportSource.Addon(id: id, name: name, version: addon["version"] as? String ?? "",
+                                              skip: "a \(source.name) add-on — look for it in the Chrome Web Store",
+                                              lookFor: true))
+            }
+        }
+        return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// The key that unlocks the logins, from key4.db: the empty primary
@@ -1455,8 +1636,12 @@ enum ImportSource: Identifiable, Hashable {
         var bookmarks = 0
         var places = 0
         var passwords = 0
-        /// Chrome Web Store ids, for a Chromium browser.
-        var extensions: [String] = []
+        /// Every extension it has, those that can come and those that can't.
+        var addons: [Addon] = []
+        /// Chrome Web Store ids, for a Chromium browser: the ones that come.
+        var extensions: [String] { addons.filter(\.comes).map(\.id) }
+        /// The ones that can't, the browser's own left out.
+        var leftBehind: [Addon] { addons.filter { !$0.comes && !$0.builtIn } }
         /// The open tabs and tab groups, for a Chromium browser: read here,
         /// off the main thread, and brought in from this as it is.
         var session = SessionImport.Snapshot()
@@ -1469,6 +1654,42 @@ enum ImportSource: Identifiable, Hashable {
         }
     }
 
+    // MARK: - extensions
+
+    /// An extension another browser has, and whether it can come here.
+    struct Addon: Hashable, Identifiable {
+        /// A Chrome Web Store id, or the other browser's own.
+        let id: String
+        let name: String
+        let version: String
+        /// Why it can't come; nil for one the Chrome Web Store has.
+        let skip: String?
+        /// The browser's own, or one it came with: counted, not listed.
+        var builtIn = false
+        /// Firefox's or Safari's: only to be looked for in the store.
+        var lookFor = false
+
+        var comes: Bool { skip == nil }
+
+        /// Looking for one like it in the Chrome Web Store, by name.
+        var search: URL? {
+            var parts = URLComponents(string: "https://chromewebstore.google.com/search")
+            parts?.path += "/" + name.replacingOccurrences(of: "/", with: " ")
+            return parts?.url
+        }
+    }
+
+    /// Which Search profile each of the browser's goes into, when every
+    /// profile comes as its own (see Browser.takeProfiles): the browser's
+    /// first — Chrome's "Default", Firefox's own — into this window's.
+    var firstProfile: String? {
+        let ids = profiles.map(\.id)
+        switch self {
+        case .chromium: return ids.contains("Default") ? "Default" : ids.first
+        case .mozilla: return usual ?? ids.first
+        }
+    }
+
     static func installed() -> [ImportSource] {
         Chromium.installed().map(ImportSource.chromium) + Mozilla.installed().map(ImportSource.mozilla)
     }
@@ -1477,6 +1698,52 @@ enum ImportSource: Identifiable, Hashable {
     /// the sheet says how to export it instead.
     static var safari: Bool {
         FileManager.default.fileExists(atPath: "/Applications/Safari.app")
+    }
+
+    /// Safari's extensions, which can't come: what macOS has registered for
+    /// it, read from pluginkit rather than Safari's own files, which macOS
+    /// keeps from other apps. Listed so one like each can be found in the
+    /// Chrome Web Store. None on a test run.
+    static func safariAddons() -> [Addon] {
+        guard !Store.testing, safari else { return [] }
+        let run = Process()
+        run.executableURL = URL(fileURLWithPath: "/usr/bin/pluginkit")
+        run.arguments = ["-m", "-A", "-v", "-p", "com.apple.Safari.web-extension,com.apple.Safari.extension"]
+        let pipe = Pipe()
+        run.standardOutput = pipe
+        run.standardError = FileHandle.nullDevice
+        guard (try? run.run()) != nil else { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        run.waitUntilExit()
+        return safariAddons(listing: String(decoding: data, as: UTF8.self)) { path in
+            Bundle(path: path).flatMap { bundle in
+                (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") ?? bundle.object(forInfoDictionaryKey: "CFBundleName")) as? String
+            }
+        }
+    }
+
+    /// pluginkit's lines — "+    com.example.ext(1.2)<tab>uuid<tab>date<tab>path" —
+    /// as extensions, named by the extension itself, or else by the app it
+    /// came in.
+    static func safariAddons(listing: String, name: (String) -> String?) -> [Addon] {
+        var out: [Addon] = []
+        var seen = Set<String>()
+        for line in listing.components(separatedBy: .newlines) {
+            let fields = line.components(separatedBy: "\t")
+            let head = fields[0].trimmingCharacters(in: .whitespaces)
+            // "-" is one turned off in Safari.
+            guard fields.count >= 2, !head.hasPrefix("-"),
+                  let open = head.lastIndex(of: "("), head.hasSuffix(")") else { continue }
+            let id = String(head[..<open]).trimmingCharacters(in: CharacterSet(charactersIn: "+!= ").union(.whitespaces))
+            let version = String(head[head.index(after: open)..<head.index(before: head.endIndex)])
+            guard !id.isEmpty, seen.insert(id).inserted else { continue }
+            let path = fields.last!.trimmingCharacters(in: .whitespaces)
+            let app = path.components(separatedBy: "/").last { $0.hasSuffix(".app") }.map { String($0.dropLast(4)) }
+            let called = name(path).flatMap { $0.isEmpty ? nil : $0 } ?? app ?? id
+            out.append(Addon(id: id, name: called, version: version,
+                             skip: "a Safari extension — look for it in the Chrome Web Store", lookFor: true))
+        }
+        return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 }
 

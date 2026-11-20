@@ -1863,11 +1863,30 @@ final class Bench {
                 }
             }
             // What is now recorded from it, as the sheet shows it.
-            if let record = ImportRecords.of(source.name) {
-                out["record"] = ["bookmarks": record.bookmarks, "places": record.places, "passwords": record.passwords,
-                                 "ids": record.bookmarkIDs.count]
+            func finish() {
+                if let record = ImportRecords.of(source.name) {
+                    out["record"] = ["bookmarks": record.bookmarks, "places": record.places, "passwords": record.passwords,
+                                     "ids": record.bookmarkIDs.count]
+                }
+                answer(out)
             }
-            answer(out)
+            // Every profile into one of its own here, as the sheet does with
+            // Profiles on: "profiles" with "bookmarks" and/or "history".
+            if what.contains("profiles") {
+                browser.takeProfiles(from: source, bookmarks: what.contains("profile-bookmarks"),
+                                     history: what.contains("profile-history")) { takes in
+                    out["profiles-taken"] = takes.map { take -> [String: Any] in
+                        let into = Profiles.shared.profile(take.into)
+                        return ["name": take.name, "into": into.name, "here": take.into == browser.profileID, "made": take.made,
+                                "bookmarks": take.bookmarks, "already": take.already, "places": take.places,
+                                "intoBookmarks": Profiles.bookmarks(take.into).count]
+                    }
+                    out["profilesHere"] = Profiles.shared.list.map(\.name)
+                    finish()
+                }
+                return
+            }
+            finish()
 
         case "import-preview":
             // What the sheet counts as it opens, for every browser found:
@@ -1878,7 +1897,9 @@ final class Bench {
             let asked = Chromium.keyAsks
             func counts(_ preview: ImportSource.Preview) -> [String: Any] {
                 ["bookmarks": preview.bookmarks, "places": preview.places, "passwords": preview.passwords,
-                 "extensions": preview.extensions]
+                 "extensions": preview.extensions,
+                 "addons": preview.addons.map { ["id": $0.id, "name": $0.name, "version": $0.version, "skip": $0.skip ?? "",
+                                                 "builtIn": $0.builtIn, "lookFor": $0.lookFor] }]
             }
             let found = ImportSource.installed().map { source -> [String: Any] in
                 let usual = source.usual
@@ -1890,7 +1911,10 @@ final class Bench {
             }
             // keyAsked: by this count; keyAskedEver: by anything since launch,
             // the sheet opening included.
-            answer(["browsers": found, "safari": ImportSource.safari, "keyAsked": Chromium.keyAsks - asked,
+            // Here but kept from this app (see Chromium.unreadable): on a test
+            // run, only made-up folders that refuse to be read.
+            let refused = Chromium.unreadable().map { ["name": $0.source.name, "message": $0.message] }
+            answer(["browsers": found, "refused": refused, "safari": ImportSource.safari, "keyAsked": Chromium.keyAsks - asked,
                     "keyAskedEver": Chromium.keyAsks])
 
         case "import-file":

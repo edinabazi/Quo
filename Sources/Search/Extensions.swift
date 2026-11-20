@@ -766,16 +766,28 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
+    /// How an install from the store went, for an import to say.
+    enum Outcome: Equatable {
+        case installed
+        /// Asked about, and not wanted.
+        case declined
+        /// Here already, or being installed.
+        case already
+        /// The store, the package or WebKit said no, and why.
+        case failed(String)
+    }
+
     /// One from the store by its id, done — asked about, and installed or
     /// not — before it returns, so several brought over from another
     /// browser go one after another.
-    func install(id: String, confirm: Bool = true) async {
+    @discardableResult
+    func install(id: String, confirm: Bool = true) async -> Outcome {
         // A store id, and nothing else, goes into the request and the folder
         // names below, whoever called.
-        guard id.count == 32, id.allSatisfy({ ("a"..."p").contains($0) }) else { return }
-        guard busy.insert(id).inserted else { return }
+        guard id.count == 32, id.allSatisfy({ ("a"..."p").contains($0) }) else { return .failed("not a Chrome Web Store id") }
+        guard busy.insert(id).inserted else { return .already }
         defer { busy.remove(id) }
-        guard !installed.contains(where: { $0.id == id }) else { return }
+        guard !installed.contains(where: { $0.id == id }) else { return .already }
         let staged = Extensions.stagingFolder(for: id)
         defer { try? FileManager.default.removeItem(at: staged) }
         do {
@@ -784,9 +796,11 @@ final class Extensions: NSObject, ObservableObject {
             let target = Extensions.folder(for: id)
             try Crx.unpack(zip, into: staged)
             try ExtensionShims.prepare(staged, fresh: true)
-            try await admit(staged, as: id, fromStore: true, finalFolder: target, confirm: confirm || !Store.testing)
+            let took = try await admit(staged, as: id, fromStore: true, finalFolder: target, confirm: confirm || !Store.testing)
+            return took ? .installed : .declined
         } catch {
             browser?.announce(error.localizedDescription)
+            return .failed(error.localizedDescription)
         }
     }
 
@@ -1062,12 +1076,14 @@ final class Extensions: NSObject, ObservableObject {
 
     /// Reads what was unpacked, asks, and — on yes — moves it into place and
     /// loads it. On no, nothing is left behind.
-    private func admit(_ staged: URL, as id: String, fromStore: Bool, finalFolder: URL, confirm: Bool = true, source: URL? = nil) async throws {
+    /// Whether it was taken in: false when it was asked about and not wanted.
+    @discardableResult
+    private func admit(_ staged: URL, as id: String, fromStore: Bool, finalFolder: URL, confirm: Bool = true, source: URL? = nil) async throws -> Bool {
         let found = try await WKWebExtension(resourceBaseURL: staged)
         let name = found.displayName ?? id
         let wants = Extensions.describe(found, in: staged)
         let accepted = confirm ? await ask(install: name, wants: wants, icon: found.icon(for: CGSize(width: 64, height: 64))) : true
-        guard accepted, !installed.contains(where: { $0.id == id }) else { return }
+        guard accepted, !installed.contains(where: { $0.id == id }) else { return false }
         let permissions = Extensions.grants(found, in: staged)
         try ExtensionFiles.replace(staged, at: finalFolder)
         unload(id)
@@ -1085,13 +1101,14 @@ final class Extensions: NSObject, ObservableObject {
         // told the browser started, and never that it was installed.
         let early = 5.5 - Date().timeIntervalSince(controllerMade)
         if early > 0 { try? await Task.sleep(for: .seconds(early)) }
-        guard installed.contains(where: { $0.id == id }) else { return }
+        guard installed.contains(where: { $0.id == id }) else { return true }
         installing.insert(id)
         if await load(item) {
             browser?.announce("\(name) is installed")
         } else {
             browser?.announce("\(name) is installed, but WebKit couldn't start it")
         }
+        return true
     }
 
     func remove(_ id: String) {
