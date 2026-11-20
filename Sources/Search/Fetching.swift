@@ -64,6 +64,8 @@ final class FetchEntry: ObservableObject, Identifiable {
     /// The page's own view while it is there; the row never keeps it, nor
     /// its web process, alive once its tab has closed.
     weak var webView: WKWebView?
+    /// The window it was asked for in, where its card shows (DownloadShelf).
+    weak var owner: Browser?
     private(set) var store: WKWebsiteDataStore?
     var destination: URL?
     /// The name asked for, before " 2" and so on: a retry is numbered afresh.
@@ -271,6 +273,19 @@ final class Fetches: ObservableObject {
     /// How long the circle stays once the last download is in.
     static let linger: TimeInterval = 5
 
+    /// A file just in, for its card in the column (DownloadShelf): there
+    /// until its card has been seen long enough, or is put away.
+    struct Arrival: Identifiable, Equatable {
+        let id: UUID
+        let file: URL
+        let bytes: Int64
+        let owner: ObjectIdentifier
+        var name: String { file.lastPathComponent }
+    }
+    @Published private(set) var arrivals: [Arrival] = []
+
+    func putAway(_ id: UUID) { arrivals.removeAll { $0.id == id } }
+
     struct StopOperation {
         let download: WKDownload
         let entry: FetchEntry?
@@ -350,6 +365,7 @@ final class Fetches: ObservableObject {
             started += 1
         }
 
+        entry?.owner = owner
         let item = Running(download, entry: entry, owner: owner, helper: helper, listed: listed || continuing != nil)
         running[ObjectIdentifier(download)] = item
         leaving?.cancel()
@@ -378,6 +394,8 @@ final class Fetches: ObservableObject {
             return
         }
         item.entry?.reached(file)
+        // Its card can come up now (DownloadShelf waits for a place).
+        objectWillChange.send()
         let shown = Progress(totalUnitCount: max(1, download.progress.totalUnitCount))
         shown.kind = .file
         shown.fileOperationKind = .downloading
@@ -507,6 +525,14 @@ final class Fetches: ObservableObject {
     /// bounces. Successful files move to Loot and no longer remain as entries.
     func finish(_ download: WKDownload, file: URL?) -> Ended? {
         guard let item = running[ObjectIdentifier(download)] else { return nil }
+        // Kept for its card first: removing the entry clears what it knew.
+        if let entry = item.entry, item.listed, let file {
+            // A download that never said its size: the file's, on disk.
+            let said = max(entry.totalBytes, entry.completedBytes)
+            let onDisk = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
+            arrivals.append(Arrival(id: entry.id, file: file, bytes: said > 0 ? said : onDisk,
+                                    owner: ObjectIdentifier(item.owner)))
+        }
         if let entry = item.entry { remove(entry) }
         guard let ended = take(download) else { return nil }
         if let file {
@@ -662,6 +688,9 @@ struct FetchDoor: View {
     /// Which side of it the floating card stands on: under it in the row,
     /// beside it at the column's foot.
     let arrowEdge: Edge
+    /// The column's cards say how the downloads are going (DownloadShelf):
+    /// the button rests as its arrow instead of turning a ring of its own.
+    var quiet = false
 
     @State private var hovering = false
     /// Its view, for the card to stand beside. Held, not drawn from.
@@ -671,11 +700,12 @@ struct FetchDoor: View {
         weak var view: NSView?
     }
 
-    init(browser: Browser, fetches: Fetches, arrowEdge: Edge = .bottom) {
+    init(browser: Browser, fetches: Fetches, arrowEdge: Edge = .bottom, quiet: Bool = false) {
         self.browser = browser
         self.fetches = fetches
         self.prefs = browser.prefs
         self.arrowEdge = arrowEdge
+        self.quiet = quiet
     }
 
     /// Whether it is in the row, for those that make room for it. Its list
@@ -697,7 +727,7 @@ struct FetchDoor: View {
         if Self.shows(fetches, prefs, hanging: browser.downloadsHanging) {
             Button { browser.showDownloads(toggles: true) } label: {
                 ZStack {
-                    if !fetches.showing {
+                    if !fetches.showing || quiet {
                         Image(systemName: "arrow.down.circle")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.muted)

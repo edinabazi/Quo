@@ -95,7 +95,7 @@ final class Bench {
     /// nothing of yours, and scripts set them up with a defaults write.
     @MainActor
     enum Consent {
-        private static let mark = SwitchMark(service: "com.officecommun.search.bench")
+        private static let mark = SwitchMark(service: "\(Store.home).bench")
         static var given: Bool { mark.given }
         static func grant() { mark.grant() }
         static func revoke() { mark.revoke() }
@@ -1057,6 +1057,15 @@ final class Bench {
             // The size the peek's page is drawn at (see Tab.applyRememberedZoom).
             out["peekZoom"] = Double(browser.peekTab?.built?.pageZoom ?? 0)
             out["fetching"] = ["showing": browser.fetches.showing, "fraction": browser.fetches.fraction ?? -1, "done": browser.fetches.done]
+            // The cards over the column's foot (DownloadShelf): each one's
+            // kind and file, and how tall the shelf stands.
+            out["downloadCards"] = DownloadShelf.cards(browser, browser.fetches).map { card -> [String: Any] in
+                switch card {
+                case .running(let entry): return ["kind": "running", "name": entry.name, "fraction": entry.fraction ?? -1]
+                case .arrived(let arrival): return ["kind": "arrived", "name": arrival.name, "bytes": arrival.bytes]
+                }
+            }
+            out["downloadShelf"] = DownloadShelf.height(browser, browser.fetches)
             // Where the peek's page sits in the window, from its top-left corner, in points.
             if let web = browser.peekTab?.built, let window = web.window {
                 let r = web.convert(web.bounds, to: nil)
