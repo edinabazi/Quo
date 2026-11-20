@@ -5359,6 +5359,13 @@ final class Browser: NSObject, ObservableObject {
         return id
     }
 
+    /// A group an agent made to work in, marked as its (AgentGroups.swift).
+    func markAgentGroup(_ id: UUID, agent: String) {
+        guard let index = tabGroups.firstIndex(where: { $0.id == id }), tabGroups[index].agent != agent else { return }
+        tabGroups[index].agent = agent
+        writeSession(now: true)
+    }
+
     func renameTabGroup(_ id: UUID, to name: String) {
         guard let index = tabGroups.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

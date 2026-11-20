@@ -82,11 +82,13 @@ extension GroupDropFrames {
     }
 }
 
-/// A quiet name above the tabs it contains, in either layout.
+/// A quiet name above the tabs it contains, in either layout. An agent's
+/// group (AgentGroups.swift) wears the agent's icon and colours.
 struct GroupHeading: View {
     @Environment(\.greys) private var greys
     @Environment(\.tabShortcutNumbers) private var shortcutNumbers
     @ObservedObject var browser: Browser
+    @ObservedObject private var activity = AgentActivity.shared
     let group: TabGroup
     var horizontal = false
     var dragSpace: String? = nil
@@ -101,15 +103,23 @@ struct GroupHeading: View {
 
     private var editing: Bool { browser.editingGroupID == group.id }
 
-    /// Its height in the column, a little under a tab's.
-    static let height: CGFloat = 24
+    /// Its height in the column, a little under a tab's; with Roomy's taller
+    /// tabs, taller too, so a heading doesn't look squeezed between them.
+    static func height(_ prefs: Preferences) -> CGFloat { prefs.roomyTabs ? 30 : 24 }
+    /// The name's size, beside a tab's title.
+    private static func type(_ prefs: Preferences) -> CGFloat { prefs.roomyTabs ? 13.5 : 12.5 }
+
+    /// The agent at work in one of its tabs.
+    private var working: Bool {
+        group.agent != nil && browser.visibleTabs(in: group).contains { activity.working.contains($0.id) }
+    }
     /// And in the column of icons.
     static let compactHeight: CGFloat = 18
 
     /// Measured once a name: the row asks for every heading's on every redraw.
     private static var measured: [String: CGFloat] = [:]
     private static let font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
-    static func width(for name: String, numbered: Bool = false) -> CGFloat {
+    static func width(for name: String, numbered: Bool = false, agent: Bool = false) -> CGFloat {
         let text: CGFloat
         if let known = measured[name] {
             text = known
@@ -118,7 +128,7 @@ struct GroupHeading: View {
             if measured.count > 500 { measured.removeAll() }
             measured[name] = text
         }
-        return text + 20 + (numbered ? 23 : 0)
+        return text + 20 + (numbered ? 23 : 0) + (agent ? 21 : 0)
     }
 
     var body: some View {
@@ -128,8 +138,12 @@ struct GroupHeading: View {
     /// The column of icons' heading: the letter, a fold mark beside it.
     private var short: some View {
         HStack(spacing: 2) {
-            Text(group.name.first.map { String($0).uppercased() } ?? "•")
-                .font(.system(size: 9.5, weight: .semibold))
+            if let agent = group.agent {
+                AgentGlyph(agent: agent, size: 11)
+            } else {
+                Text(group.name.first.map { String($0).uppercased() } ?? "•")
+                    .font(.system(size: 9.5, weight: .semibold))
+            }
             Image(systemName: "chevron.down")
                 .font(.system(size: 6.5, weight: .bold))
                 .rotationEffect(.degrees(group.collapsed ? -90 : 0))
@@ -137,8 +151,14 @@ struct GroupHeading: View {
         .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.muted)
         .frame(maxWidth: .infinity)
         .frame(height: Self.compactHeight)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(dropping ? greys.wash : (hovering ? greys.hover : greys.tile)))
+        .background {
+            if group.agent != nil {
+                AgentGroupGround(working: working, hovering: hovering, dropping: dropping, radius: 6)
+            } else {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(dropping ? greys.wash : (hovering ? greys.hover : greys.tile))
+            }
+        }
         .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .onTapGesture { browser.toggleTabGroup(group.id) }
         .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
@@ -164,22 +184,30 @@ struct GroupHeading: View {
     }
 
     private var long: some View {
-        HStack(spacing: 8) {
+        let size = horizontal ? 12.5 : Self.type(browser.prefs)
+        let agent = group.agent
+        return HStack(spacing: agent != nil ? 7 : 8) {
+            if let agent {
+                AgentGlyph(agent: agent, size: horizontal || !browser.prefs.roomyTabs ? 14 : 16)
+                    .help(AgentGlyph.name(of: agent).map { "Made by \($0)" } ?? "Made by an extension")
+            }
             if editing {
                 TextField("Group name", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: size, weight: .medium))
                     .frame(width: horizontal ? max(60, Self.width(for: group.name) - 20) : nil)
                     .focused($focused)
                     .onSubmit(commit)
                     .onExitCommand { browser.editingGroupID = nil }
             } else {
                 Text(group.name)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: size, weight: agent != nil ? .semibold : .medium))
+                    .foregroundStyle(agent != nil ? Palette.ink.opacity(0.8) : Palette.muted)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             if !horizontal { Spacer(minLength: 0) }
+            if working, !editing, !horizontal { AgentWorkingDots().transition(.opacity) }
             if !editing, group.collapsed {
                 if let number = shortcutNumbers[group.id] {
                     TabShortcutNumber(number: number)
@@ -189,18 +217,26 @@ struct GroupHeading: View {
             }
             if !editing && !horizontal {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: browser.prefs.roomyTabs ? 10 : 9, weight: .medium))
                     .rotationEffect(.degrees(group.collapsed ? -90 : 0))
-                    .opacity(hovering ? 1 : 0)
+                    // A folded group says so; an open one shows its tabs.
+                    .opacity(hovering ? 1 : group.collapsed ? 0.55 : 0)
             }
         }
         .foregroundStyle(Palette.muted)
         .padding(.horizontal, 10)
-        .frame(height: horizontal ? 28 : Self.height)
+        .frame(height: horizontal ? 28 : Self.height(browser.prefs))
         .frame(maxWidth: horizontal ? nil : .infinity, alignment: .leading)
         .fixedSize(horizontal: horizontal, vertical: false)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .fill(dropping ? greys.wash : (hovering ? greys.hover : .clear)))
+        .animation(.easeOut(duration: 0.2), value: working)
+        .background {
+            if agent != nil {
+                AgentGroupGround(working: working, hovering: hovering, dropping: dropping)
+            } else {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(dropping ? greys.wash : (hovering ? greys.hover : .clear))
+            }
+        }
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture { if !editing { browser.toggleTabGroup(group.id) } }
         .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
