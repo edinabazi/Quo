@@ -1764,6 +1764,7 @@ enum ImportSource: Identifiable, Hashable {
         switch self {
         case .chromium: return ids.contains("Default") ? "Default" : ids.first
         case .mozilla: return usual ?? ids.first
+        case .webkit: return ids.first
         }
     }
 

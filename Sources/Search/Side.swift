@@ -595,7 +595,8 @@ struct SideBar: View {
                     PinGrid(cells: cells) {
                         ForEach(Array(pins.enumerated()), id: \.element.id) { index, tab in
                             PinSquare(browser: browser, prefs: prefs, tab: tab, live: tab.id == row.active,
-                                      pill: pill, width: cells[index].width, height: cells[index].height)
+                                      pill: pill, width: cells[index].width, height: cells[index].height,
+                                      interactive: false)
                         }
                     }
                 }
@@ -644,7 +645,7 @@ struct SideBar: View {
     private func previewLines(_ row: Parked, pins: [PinRowLine], groups: [Parked.DrawnGroup], rest: [Tab],
                               keeps: Bool) -> [PreviewLine] {
         let front = row.splits.first { pair in row.active.map(pair.tabs.contains) ?? false }?.left ?? row.active
-        let heading = icons ? GroupHeading.compactHeight : GroupHeading.height
+        let heading = icons ? GroupHeading.compactHeight : GroupHeading.height(prefs)
         let lines: (Tab) -> CGFloat = { tab in
             CGFloat(self.prefs.splitView ? (row.splits.first { $0.left == tab.id }?.tabs.count ?? 1) : 1)
         }
@@ -1606,7 +1607,7 @@ private struct PinSquare: View, Equatable {
     private let peek: Tab?
 
     init(browser: Browser, prefs: Preferences, tab: Tab, live: Bool, pill: Namespace.ID,
-         width: CGFloat = 34, height: CGFloat = 34) {
+         width: CGFloat = 34, height: CGFloat = 34, interactive: Bool = true) {
         self.browser = browser
         self.prefs = prefs
         self.tab = tab
@@ -1614,7 +1615,8 @@ private struct PinSquare: View, Equatable {
         self.pill = pill
         self.width = width
         self.height = height
-        lettering = browser.editingPin == tab.id
+        // The space map's copy never takes the letter's field (see SideRow).
+        lettering = interactive && browser.editingPin == tab.id
         selected = browser.selectedTabIDs.contains(tab.id)
         pickedAmongOthers = browser.isPickedAmongOthers(tab)
         peek = browser.peekFrom == tab.id ? browser.peekTab : nil
@@ -1758,8 +1760,10 @@ private struct SideRow: View, Equatable {
         self.close = close
         self.interactive = interactive
         // With the address bar up, the address is edited there; a name
-        // still is here.
-        editing = browser.editingTab == tab.id && (browser.renamingTab || !browser.addressBarUp)
+        // still is here. Never in a row only drawn, as the space map's
+        // copies of this space's rows are: two fields for one tab took the
+        // keys from each other, and the edit ended as it began.
+        editing = interactive && browser.editingTab == tab.id && (browser.renamingTab || !browser.addressBarUp)
         selected = browser.selectedTabIDs.contains(tab.id)
         pickedAmongOthers = browser.isPickedAmongOthers(tab)
         peek = browser.peekFrom == tab.id ? browser.peekTab : nil
