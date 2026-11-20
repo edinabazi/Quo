@@ -663,11 +663,16 @@ final class PaneStage: NSView {
                                        owner: self, userInfo: nil))
     }
 
+    // Not handed on up (no super): the next responder is the window's
+    // hosting view, which then hit-tested all of SwiftUI's hover regions for
+    // every move over a page — three times WebKit's own work for the move,
+    // on the thread that hands the moves to the page, and doubled, as the
+    // hosting view hears the pointer through its own areas anyway. With one
+    // page there is nothing to tell apart, so nothing is worked out either.
     override func mouseMoved(with event: NSEvent) {
-        super.mouseMoved(with: event)
+        guard paired else { return hover(nil) }
         let point = convert(event.locationInWindow, from: nil)
-        let under = paired ? slots.indices.first { $0 < tabs.count && slots[$0].frame.contains(point) }.map { tabs[$0].id } : nil
-        hover(under)
+        hover(slots.indices.first { $0 < tabs.count && slots[$0].frame.contains(point) }.map { tabs[$0].id })
     }
 
     override func mouseExited(with event: NSEvent) {
