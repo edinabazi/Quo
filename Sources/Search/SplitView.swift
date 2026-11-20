@@ -158,8 +158,14 @@ private struct PaneLayers: View {
             // the stage's.
             Page(tab: tab, holdsPage: false, corner: corner, browser: browser)
 
+            // An empty page on its own is the space's home (SpaceHome.swift).
+            if tab.isBlank, !paired {
+                SpaceHomeGround(browser: browser)
+                    .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+            }
+
             if focused {
-                Omnibox(browser: browser, over: !tab.isBlank, fitted: true, tab: tab.id)
+                Omnibox(browser: browser, over: !tab.isBlank, fitted: true, tab: tab.id, homed: !paired)
             }
 
             // An empty page of a pair: the field, and the tabs already open,

@@ -501,6 +501,14 @@ extension Browser {
         switchSpace(to: list[index].id)
     }
 
+    /// The next space or the one before, in the order the spaces' menu has
+    /// them (⌥⌘→ and ⌥⌘←, as in Arc). Stops at either end, as a swipe does.
+    func stepSpace(_ by: Int) {
+        let list = everySpace
+        guard let at = list.firstIndex(where: { $0.id == spaceID }), list.indices.contains(at + by) else { return }
+        switchSpace(to: list[at + by].id)
+    }
+
     /// The icon a new space gets unless told: the first no space wears yet.
     var freeIcon: String {
         let used = Set(spaces.map(\.symbol))
@@ -803,6 +811,16 @@ struct SpaceDot: View {
     }
 }
 
+extension NSMenuItem {
+    /// Its icon, shown. macOS 27 hides a menu item's icon unless it is asked
+    /// to show it, and an app built with its SDK loses every one: the
+    /// spaces' icons, the Icon menu's choices, bookmarks' site icons.
+    func show(_ icon: NSImage?) {
+        image = icon
+        if #available(macOS 27, *) { preferredImageVisibility = icon == nil ? .automatic : .visible }
+    }
+}
+
 /// The dot's menu: the spaces, then what can be done to the one on screen.
 @MainActor
 enum SpaceMenu {
@@ -855,7 +873,7 @@ enum SpaceMenu {
                 let entry = item(space.name, key: index < 9 ? "\(index + 1)" : "", checked: space.id == browser.spaceID) {
                     browser.switchSpace(to: space.id)
                 }
-                entry.image = image(space.symbol, tint: space.tint)
+                entry.show(image(space.symbol, tint: space.tint))
                 menu.addItem(entry)
                 index += 1
             }
@@ -879,7 +897,7 @@ enum SpaceMenu {
         let icons = NSMenu()
         for (symbol, name) in zip(Spaces.icons, Spaces.iconNames) {
             let choice = item(name, checked: here.symbol == symbol) { browser.setSpaceIcon(here.id, to: symbol) }
-            choice.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
+            choice.show(NSImage(systemSymbolName: symbol, accessibilityDescription: name))
             icons.addItem(choice)
         }
         let icon = NSMenuItem(title: "Icon", action: nil, keyEquivalent: "")

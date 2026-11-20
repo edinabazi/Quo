@@ -44,6 +44,17 @@ def run(t, swapped):
         t.ok(f"{label}: the space key reads the physical digit", state["spaceID"] == first)
         state = press(THREE, "3", ["ctrl"] if swapped else ["cmd"])
         t.ok(f"{label}: the third tab, back in the first space", state["activeID"] == tabs[2] and state["spaceID"] == first)
+        # ⌥⌘→ and ⌥⌘←, as in Arc: the next space and the one before,
+        # either way round, and nothing past the ends.
+        state = press(124, "\uf703", ["cmd", "opt"])
+        t.ok(f"{label}: ⌥⌘→ goes to the next space", state["spaceID"] == second)
+        state = press(124, "\uf703", ["cmd", "opt"])
+        t.ok(f"{label}: ⌥⌘→ at the last space stays there", state["spaceID"] == second)
+        state = press(123, "\uf702", ["cmd", "opt"])
+        t.ok(f"{label}: ⌥⌘← goes back a space", state["spaceID"] == first)
+        state = press(123, "\uf702", ["cmd", "opt"])
+        t.ok(f"{label}: ⌥⌘← at the first space stays there, its tab as it was",
+             state["spaceID"] == first and state["activeID"] == tabs[2])
         if swapped:
             # The switch off again, live: ⌘ back to the tabs, ⌃ to the spaces.
             sv.cmd({"do": "ui", "spacesOnCommand": False})

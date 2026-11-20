@@ -214,12 +214,16 @@ struct WelcomePanel: View {
                         }
                         Row("Colour") {
                             // A colour is a space's: picked, spaces come on
-                            // to wear it.
-                            Swatches(selection: Binding(get: { browser.space.colour },
-                                                        set: { colour in
-                                                            if colour > 0, !prefs.usesSpaces { prefs.usesSpaces = true }
-                                                            browser.setSpaceColour(browser.spaceID, to: colour)
-                                                        }))
+                            // to wear it. The wheel beside them is the whole
+                            // picker, as the space's Colour… has it.
+                            HStack(spacing: 10) {
+                                Swatches(selection: Binding(get: { browser.space.colour },
+                                                            set: { colour in
+                                                                if colour > 0, !prefs.usesSpaces { prefs.usesSpaces = true }
+                                                                browser.setSpaceColour(browser.spaceID, to: colour)
+                                                            }))
+                                WheelButton(browser: browser, prefs: prefs)
+                            }
                         }
                     }
                 }
@@ -227,8 +231,7 @@ struct WelcomePanel: View {
             }
             .frame(width: 420)
             MiniWindow(layout: prefs.tabsLayout, roomy: prefs.roomyTabs, look: prefs.look,
-                       tint: browser.space.colour > 0 && Spaces.colours.indices.contains(browser.space.colour)
-                           ? Spaces.colours[browser.space.colour] : nil)
+                       tint: browser.space.tint)
                 .frame(maxWidth: .infinity)
                 .aspectRatio(1.45, contentMode: .fit)
                 .rise(2)
@@ -852,6 +855,54 @@ private struct Chips<Option: Hashable>: View {
         .padding(3)
         .background(Capsule().fill(Color.white.opacity(0.08)))
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
+    }
+}
+
+/// The wheel's own swatch, after the five: every hue round a ring. It opens
+/// the space's whole picker — the wheel, gradients, grain — in a popover;
+/// whatever is picked there turns spaces on to wear it, as a swatch does.
+private struct WheelButton: View {
+    @ObservedObject var browser: Browser
+    @ObservedObject var prefs: Preferences
+    @State private var open = false
+    @State private var hovering = false
+
+    private var custom: Bool {
+        let space = browser.space
+        return space.gradient != nil || (space.look != nil && space.colour == 0) || space.grain != nil
+    }
+
+    var body: some View {
+        Button { open = true } label: {
+            ZStack {
+                Circle().fill(AngularGradient(colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .red],
+                                              center: .center))
+                Circle().fill(RadialGradient(colors: [.white.opacity(0.85), .white.opacity(0)], center: .center,
+                                             startRadius: 0, endRadius: 9))
+                Image(systemName: "plus")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundStyle(.black.opacity(0.55))
+                    .opacity(custom ? 0 : 1)
+            }
+            .frame(width: 22, height: 22)
+            .padding(3)
+            .overlay(Circle().strokeBorder(.white, lineWidth: custom ? 2 : 0))
+            .scaleEffect(hovering || custom ? 1.08 : 1)
+            .rotationEffect(.degrees(hovering && !Motion.reduced ? 30 : 0))
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { on in withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { hovering = on } }
+        .help("More colours, gradients and grain")
+        .accessibilityLabel("More colours")
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            SpaceLookPicker(browser: browser, id: browser.spaceID)
+                // A drag the popover closed under keeps nothing but what was.
+                .onDisappear { if LookDraft.shared.preview != nil { LookDraft.shared.end() } }
+        }
+        .onChange(of: browser.space.look) { _, look in
+            if look != nil, !prefs.usesSpaces { prefs.usesSpaces = true }
+        }
     }
 }
 

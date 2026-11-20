@@ -661,9 +661,9 @@ enum Rewind {
             item.toolTip = page.url.absoluteString
             if let image = Favicons.shared.cached(for: page.url, shy: tab.shy)?.copy() as? NSImage {
                 image.size = NSSize(width: 16, height: 16)
-                item.image = image
+                item.show(image)
             } else {
-                item.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+                item.show(NSImage(systemSymbolName: "globe", accessibilityDescription: nil))
             }
             menu.addItem(item)
         }

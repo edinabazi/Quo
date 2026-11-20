@@ -105,7 +105,7 @@ struct GroupHeading: View {
 
     /// Its height in the column, a little under a tab's; with Roomy's taller
     /// tabs, taller too, so a heading doesn't look squeezed between them.
-    static func height(_ prefs: Preferences) -> CGFloat { prefs.roomyTabs ? 30 : 24 }
+    static func height(_ prefs: Preferences) -> CGFloat { prefs.roomyTabs ? 32 : 24 }
     /// The name's size, beside a tab's title.
     private static func type(_ prefs: Preferences) -> CGFloat { prefs.roomyTabs ? 13.5 : 12.5 }
 

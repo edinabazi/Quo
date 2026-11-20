@@ -162,9 +162,11 @@ final class SpaceWheelTests: XCTestCase {
         XCTAssertEqual(SpaceStrength.subtle.grain(space.grainAmount, dark: false), Grain.light)
         XCTAssertEqual(SpaceStrength.subtle.grain(space.grainAmount, dark: true), Grain.dark)
         XCTAssertEqual(SpaceStrength.subtle.grain(0, dark: false), 0)
-        // More is more, and the most is about three times the old switch.
-        XCTAssertGreaterThan(SpaceStrength.subtle.grain(1, dark: false), Grain.light * 3)
-        XCTAssertLessThan(SpaceStrength.vivid.grain(1, dark: false), 0.2)
+        // More is more, and the most is about two and a half times the old
+        // switch: gentler past it than up to it.
+        XCTAssertEqual(SpaceStrength.subtle.grain(1, dark: false), Grain.light * 2.4, accuracy: 0.0001)
+        XCTAssertGreaterThan(SpaceStrength.subtle.grain(0.6, dark: false), SpaceStrength.subtle.grain(0.4, dark: false))
+        XCTAssertLessThan(SpaceStrength.vivid.grain(1, dark: false), 0.14)
     }
 
     /// Grain is the space's, over a colour or a gradient alike; the

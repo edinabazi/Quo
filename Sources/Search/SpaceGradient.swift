@@ -220,7 +220,7 @@ enum SpaceStrength: String, CaseIterable, Codable, Hashable {
             case .vivid: return 1.5
             }
         }()
-        return base * (min(max(amount, 0), 1) / Grain.legacy) * boost
+        return base * (Grain.felt(amount) / Grain.legacy) * boost
     }
 
     /// The grain a gradient from before amounts had, switched on.
@@ -617,9 +617,17 @@ enum Grain {
     static let light = 0.035
     static let dark = 0.04
     /// The amount that is, the grain a space from then keeps. The most,
-    /// 1, is over three times that: the film grain of Arc's themes, short
-    /// of the column's faintest ink having to fight it, even on Vivid.
+    /// 1, is about two and a half times that (see felt): the film grain of
+    /// Arc's themes, short of the column's faintest ink having to fight it.
     static let legacy = 0.3
+
+    /// The amount as drawn: as set up to the old switch's, then gentler, so
+    /// the slider's far end is film grain and not sand (Nov 2026: the most
+    /// was three and a third times the old grain, now about two and a half).
+    static func felt(_ amount: Double) -> Double {
+        let amount = min(max(amount, 0), 1)
+        return amount <= legacy ? amount : legacy + (amount - legacy) * 0.6
+    }
 
     @MainActor static let tile: NSImage = {
         let side = 192

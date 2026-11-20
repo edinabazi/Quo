@@ -1683,7 +1683,7 @@ final class BookmarkMenu: NSObject, NSMenuDelegate {
             let item: NSMenuItem
             if node.isFolder {
                 item = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
-                item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+                item.show(NSImage(systemSymbolName: "folder", accessibilityDescription: nil))
                 let sub = NSMenu(title: node.title)
                 sub.delegate = self
                 folders[ObjectIdentifier(sub)] = node.children ?? []
@@ -1701,9 +1701,9 @@ final class BookmarkMenu: NSObject, NSMenuDelegate {
                 if let icon = Favicons.shared.cached(for: node.address) {
                     let small = icon.copy() as? NSImage ?? icon
                     small.size = NSSize(width: 16, height: 16)
-                    item.image = small
+                    item.show(small)
                 } else {
-                    item.image = BookmarkMenu.letter(String((node.host ?? "•").prefix(1)).uppercased())
+                    item.show(BookmarkMenu.letter(String((node.host ?? "•").prefix(1)).uppercased()))
                 }
             } else {
                 return nil

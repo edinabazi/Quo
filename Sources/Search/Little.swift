@@ -891,7 +891,7 @@ extension LittleOpen {
             let item = NSMenuItem(title: "Open in \(space.name)", action: #selector(MenuTarget.pick(_:)), keyEquivalent: "")
             item.target = target
             item.representedObject = space.id
-            item.image = NSImage(systemSymbolName: space.symbol, accessibilityDescription: nil)
+            item.show(NSImage(systemSymbolName: space.symbol, accessibilityDescription: nil))
             item.state = space.id == place.current ? .on : .off
             menu.addItem(item)
         }

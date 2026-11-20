@@ -502,6 +502,58 @@ final class History: ObservableObject {
         save()
     }
 
+    /// A site of the ones visited most, for an empty tab's tiles (SpaceHome):
+    /// its front page, named by its address without the www.
+    struct Site: Identifiable, Equatable {
+        let host: String
+        let url: URL
+        /// The title of its page visited most, for the site's own name.
+        var title: String = ""
+        var id: String { host }
+
+        /// What the site is called: from its page's title when that says it
+        /// ("Inbox (3) - you@gmail.com - Gmail" is Gmail, "Hacker News" is
+        /// itself), or else its address, its one word capitalised when it
+        /// has one ("github.com" is Github).
+        var name: String {
+            let labels = host.split(separator: ".").map(String.init)
+            // The site's own word: "notion" of notion.so, "ycombinator" of
+            // news.ycombinator.com.
+            let word = labels.count >= 2 ? labels[labels.count - 2] : host
+            let parts = title.components(separatedBy: CharacterSet(charactersIn: "-|–—·:/"))
+                .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && $0.count <= 18 }
+            // A part of the title that is the site's word ("Notion – Home"
+            // is Notion, "Home / X" is X), then the last part, where sites
+            // put their name ("… - Gmail"), then a title that is one part.
+            if let own = parts.first(where: { $0.lowercased().replacingOccurrences(of: " ", with: "") == word }) { return own }
+            if let last = parts.last, last.lowercased() != host { return last }
+            return labels.count == 2 ? word.capitalized : host
+        }
+    }
+
+    /// The sites visited most, often and lately, one tile each: every page
+    /// of a site counts towards it, as `frecency` weighs them, a month-old
+    /// visit about a third of a fresh one. Web sites only.
+    func mostVisited(limit: Int = 8, now: Date = Date()) -> [Site] {
+        var scores: [String: (score: Double, scheme: String)] = [:]
+        var named: [String: (score: Double, title: String)] = [:]
+        for visit in visits.values {
+            guard let url = URL(string: visit.url), let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http",
+                  var host = url.host()?.lowercased(), !host.isEmpty, host != "localhost", !host.hasPrefix("127.") else { continue }
+            if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
+            let score = History.score(visit, now: now)
+            let had = scores[host]
+            // https if any page of it was: the front page is opened that way.
+            scores[host] = ((had?.score ?? 0) + score, had?.scheme == "https" ? "https" : scheme)
+            if !visit.title.isEmpty, score > (named[host]?.score ?? -1) { named[host] = (score, visit.title) }
+        }
+        return scores.sorted { $0.value.score == $1.value.score ? $0.key < $1.key : $0.value.score > $1.value.score }
+            .prefix(limit)
+            .compactMap { host, value in
+                URL(string: "\(value.scheme)://\(host)/").map { Site(host: host, url: $0, title: named[host]?.title ?? "") }
+            }
+    }
+
     /// The last eight places, newest first; worked out again only once the
     /// history has changed.
     func recent() -> [Trace] {

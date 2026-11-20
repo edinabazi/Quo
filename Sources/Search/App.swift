@@ -609,6 +609,8 @@ struct ContentView: View {
             SplitStage(browser: browser, corner: cards ? Metrics.cardRadius : 0, immersed: fullscreenTab?.id)
         } else if let tab = browser.active {
             Page(tab: tab, corner: cards ? Metrics.cardRadius : 0, browser: browser)
+                // An empty tab is the space's home (SpaceHome.swift).
+                .overlay { if tab.isBlank { SpaceHomeGround(browser: browser) } }
                 .overlay {
                     if browser.prefs.showsLinks { LinkBubble(status: browser.linkStatus) }
                 }
@@ -798,7 +800,7 @@ struct ContentView: View {
         // an ordinary tab that is not currently paired. Drawing it here too
         // leaves two offset address fields on a blank tab.
         if !browser.prefs.splitView {
-            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true))
+            Omnibox(browser: browser, over: !(browser.active?.isBlank ?? true), homed: true)
                 // Centred on the page, not on the window. The column of tabs
                 // is not what the field is standing over, and dimming it along
                 // with the page says otherwise.

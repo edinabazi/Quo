@@ -334,6 +334,10 @@ struct Command: Identifiable {
         Command("history.archive", "Archived Tabs…", .history, nil) { $0.archiving = true },
         Command("history.clearData", "Clear Browsing Data…", .history, KeyCombo("delete", shift: true)) { $0.clearBrowsingData() },
         Command("history.clear", "Clear History", .history, nil) { $0.clearHistory() },
+    ] + [
+        // Arc's: ⌥⌘← and ⌥⌘→ walk the spaces, as ⌃1–⌃9 jump to one.
+        Command("spaces.previous", "Previous Space", .spaces, KeyCombo("left", option: true)) { $0.stepSpace(-1) },
+        Command("spaces.next", "Next Space", .spaces, KeyCombo("right", option: true)) { $0.stepSpace(1) },
     ] + (1...9).map { number in
         Command("spaces.\(number)", "Space \(number)", .spaces,
                 KeyCombo(String(number), command: false, control: true)) { browser in

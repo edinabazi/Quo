@@ -63,17 +63,25 @@ struct Omnibox: View {
     @State private var shake: CGFloat = 0
     @State private var refused = false
 
+    /// An empty tab's field, alone in its window or pane: the space's home
+    /// is around it (`homed`, from whoever puts the field up).
+    private var home: Bool { homed && !over && browser.active?.isBlank == true }
+    /// Whether this field may have the space's home around it: not the
+    /// field of an empty page beside another one, which lists open tabs.
+    var homed = false
+
     /// Sized to a pane of a split rather than to the window.
     var fitted = false
     /// The page whose pane this field stands on, with Split View on.
     var tab: Tab.ID?
 
-    init(browser: Browser, over: Bool, fitted: Bool = false, tab: Tab.ID? = nil) {
+    init(browser: Browser, over: Bool, fitted: Bool = false, tab: Tab.ID? = nil, homed: Bool = false) {
         self.browser = browser
         self.typing = browser.typing
         self.over = over
         self.fitted = fitted
         self.tab = tab
+        self.homed = homed
     }
 
     var body: some View {
@@ -106,6 +114,25 @@ struct Omnibox: View {
 
                 field
                     .frame(width: width)
+                // On an empty tab, the space's home hangs from the field too:
+                // its icon and a greeting above, the sites you visit most and
+                // the tabs you closed below, until there's something typed
+                // for the list to take that room (SpaceHome.swift).
+                .overlay(alignment: .bottom) {
+                    if home {
+                        SpaceHomeHeader(browser: browser)
+                            .fixedSize()
+                            .offset(y: -(m.height + 30))
+                    }
+                }
+                .overlay(alignment: .top) {
+                    if home, browser.offers.isEmpty, browser.siteOffer == nil, browser.switcherNote == nil, typing.typed.isEmpty {
+                        SpaceHomeBelow(browser: browser)
+                            .fixedSize()
+                            .offset(y: m.height + 34)
+                            .transition(.opacity)
+                    }
+                }
                 // The list hangs below the field rather than stacking with it,
                 // so a list that grows never lifts the field out from under
                 // what is being typed.
