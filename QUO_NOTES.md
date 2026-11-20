@@ -2,6 +2,14 @@
 
 Newest first. Each version starts with its own heading, `## 0.1.0 · 20 November 2026`, and the paragraphs under it. The first paragraph of the newest is the line under the version in Settings › About and the release's notes on GitHub; all of them are in Settings › About › What's New, above Search's own.
 
+## 0.3.0 · 20 November 2026
+
+A new first run that opens with a flourish, every space at the column's foot as in Arc, and a smoother way to make a space.
+
+The onboarding opens on black with the mark lighting up out of it, then takes on the colour you pick for your space as you pick it, on dark glass cards that read at a glance. Bringing things over is calmer: nothing switched on that there's nothing of, Arc's spaces as one of Arc's choices, and a card that says which extension is being installed and what it's waiting on.
+
+The foot of the column shows every space as a row of icons, the one you're in lit, with + for another, a size up with Roomy. Making a space fades the tabs away and brings its card in a part at a time. Bookmarks rise from the foot as a card, and the Colour… picker and the new space card are a size up with Roomy.
+
 ## 0.2.0 · 20 November 2026
 
 The small window for links as Arc's, a colour wheel for spaces, an empty tab that's your space's home, ⌘T with your open tabs, and extensions that slow pages down offered On click.
