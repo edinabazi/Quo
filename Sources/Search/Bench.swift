@@ -3658,7 +3658,19 @@ final class Bench {
             // A small window for a link, made without being shown (see
             // Little.swift); then kept into the row, or closed.
             switch request["what"] as? String ?? "" {
-            case "keep": LittleWindow.all.last?.keep()
+            case "keep":
+                // Into a space by its name, as the arrow beside Open in offers.
+                let named = (request["space"] as? String).flatMap { name in browser.spaces.first { $0.name == name }?.id }
+                LittleWindow.all.last?.keep(in: named)
+            case "flight":
+                let path = request["path"] as? String ?? NSTemporaryDirectory() + "search-little-flight.png"
+                guard let little = LittleWindow.all.last else { answer(["error": "no small window"]); return }
+                little.flightPicture(to: path) { saved in answer(["picture": saved ? path : ""]) }
+                return
+            case "picture":
+                let path = request["path"] as? String ?? NSTemporaryDirectory() + "search-little.png"
+                answer(["picture": LittleWindow.all.last?.picture(to: path) == true ? path : ""])
+                return
             case "close": LittleWindow.all.last?.close()
             case "state": break
             case "look": break

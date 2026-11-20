@@ -87,6 +87,16 @@ try:
     st = little("look")
     t.ok("Open in Search moves the page into the row", "127.0.0.1" in st["tabs"] and st["littles"] == [], st)
     kept = next(x for x in sv.cmd({"do": "tabs"})["tabs"] if x["active"])
+    # Into another space, from the arrow beside Open in: the window turns to
+    # it, and the page is its tab there.
+    sv.cmd({"do": "ui", "spaces": True})
+    sv.cmd({"do": "space", "action": "new", "name": "Elsewhere"})
+    sv.cmd({"do": "space", "action": "go", "index": 1})
+    little(f"{sv.BASE}/spaced"); time.sleep(1.5)
+    little_state = sv.cmd({"do": "little", "what": "keep", "space": "Elsewhere"}); time.sleep(1)
+    here = sv.cmd({"do": "space"})
+    t.ok("Open in another space: the window turns to it, the page its tab",
+         here.get("current") == "Elsewhere" and any("/spaced" in x["url"] for x in sv.cmd({"do": "tabs"})["tabs"]), here)
     t.ok("…and the address bar says where it is, with no reload", kept["atRest"].startswith("127.0.0.1") and kept["atRestShown"], kept)
 
     # Three windows, each with a page, written down; then a launch made by a

@@ -4,6 +4,7 @@ Everything Quo has added to or fixed in [Search](https://github.com/driceroland/
 
 ## Looks and feel
 
+- **The small window for links, as Arc's Little Arc**: larger, it springs open, fades away, and kept, flies into its place in the browser's window; the page is a card on a frame in the space's colour; its bar has the site's icon, the site and the rest of the address dimmed, Back once you follow a link, Copy Link, a light while it loads, and Open in the space you're on, with the others on an arrow beside it. Search's had the site's name and Open in Search. *Nov 2026*
 - **An agent's tab group looks like one**: the group Claude or another agent makes to work in shows the agent's icon before its name, a soft wash of colour and a thread down the side of its tabs, and, while the agent is working there, moving dots and a light passing over the heading. Your own groups look as before. *Nov 2026*
 - **Group headings fit Roomy**: taller, with larger names, so they sit in proportion with Roomy's taller tabs instead of looking squeezed between them, and a folded group shows its fold mark. *Nov 2026*
 - **An onboarding to match Arc's and Dia's**: six full-window steps on a slowly moving gradient, with frosted cards that rise in. Pick the look, where the tabs go, Roomy or Compact and a colour, with a live preview; bring Arc's spaces or another browser's things over; set up sync, the blocker and its lists, and the default browser; and finish on the six keys worth knowing. Search had four plain pages. *Nov 2026*
