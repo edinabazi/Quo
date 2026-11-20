@@ -48,6 +48,12 @@ final class ExtensionDebuggerTests: XCTestCase {
         XCTAssertFalse(message.isEmpty)
     }
 
+    @available(macOS 15.4, *)
+    func testFrameIDIsChromeShaped() {
+        XCTAssertEqual(ExtensionDebugger.frameID(255), String(repeating: "0", count: 30) + "FF")
+        XCTAssertEqual(ExtensionDebugger.frameID(-1).count, 32)
+    }
+
     func testAgentGroupSurvivesASave() throws {
         let group = TabGroup(id: UUID(), name: "Claude", collapsed: false, agent: "abc")
         let again = try JSONDecoder().decode(TabGroup.self, from: JSONEncoder().encode(group))

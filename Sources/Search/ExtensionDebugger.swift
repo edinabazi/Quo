@@ -42,9 +42,9 @@ enum ExtensionDebugger {
     static func attach(_ id: Int, tab: Tab?, extension ext: String) throws {
         guard let tab else { throw Failure(message: "No tab with given id \(id).") }
         try check(tab)
-        if attached[ext]?.contains(id) == true {
-            throw Failure(message: "Another debugger is already attached to the tab with id: \(id).")
-        }
+        // The same extension attaching again is its background started over
+        // (an update, a worker woken afresh), which in Chrome would have
+        // detached it: it is attached, as it asked.
         attached[ext, default: []].insert(id)
     }
 
@@ -104,7 +104,7 @@ enum ExtensionDebugger {
         case "Page.captureScreenshot":
             return try await screenshot(params, of: web, tab: tab)
         case "Page.getFrameTree":
-            return ["frameTree": ["frame": frame(web, tab: tab), "childFrames": [Any]()]]
+            return ["frameTree": ["frame": frame(web, tab: tab, id: id), "childFrames": [Any]()]]
         case "Page.getNavigationHistory":
             let list = web.backForwardList
             let items = list.backList + (list.currentItem.map { [$0] } ?? []) + list.forwardList
@@ -125,7 +125,7 @@ enum ExtensionDebugger {
                   ["http", "https"].contains(url.scheme?.lowercased() ?? "") || text == "about:blank"
             else { throw Failure(message: "Cannot navigate to invalid URL") }
             web.load(URLRequest(url: url))
-            return ["frameId": frameID(tab), "loaderId": UUID().uuidString]
+            return ["frameId": frameID(id), "loaderId": UUID().uuidString]
         case "Page.reload":
             if params["ignoreCache"] as? Bool == true { web.reloadFromOrigin() } else { web.reload() }
             return [String: Any]()
@@ -148,7 +148,7 @@ enum ExtensionDebugger {
              "DOM.requestNode", "DOM.getBoxModel", "DOM.getContentQuads", "DOM.scrollIntoViewIfNeeded", "DOM.focus",
              "DOM.getOuterHTML", "DOM.setAttributeValue", "DOM.getNodeForLocation", "DOM.getAttributes",
              "DOM.removeNode", "DOM.setNodeValue":
-            return try await kit(method, params, in: web)
+            return try await kit(method, params, in: web, frame: frameID(id))
         default:
             throw Failure(message: "'\(method)' wasn't found")
         }
@@ -471,16 +471,17 @@ enum ExtensionDebugger {
 
     // MARK: - frames
 
-    private static func frameID(_ tab: Tab) -> String {
-        tab.id.uuidString.replacingOccurrences(of: "-", with: "").uppercased()
-    }
+    /// The tab's main frame, named as Chrome names one: 32 hex digits, here
+    /// the Chrome tab id's, so the shim names it the same way in the events
+    /// it sends (ExtensionShims, `frameOf`).
+    static func frameID(_ id: Int) -> String { String(format: "%032X", max(id, 0)) }
 
-    private static func frame(_ web: WKWebView, tab: Tab) -> [String: Any] {
+    private static func frame(_ web: WKWebView, tab: Tab, id: Int) -> [String: Any] {
         let url = web.url ?? tab.address
         let origin = url.flatMap { u in u.scheme.map { "\($0)://\(u.host() ?? "")" + (u.port.map { ":\($0)" } ?? "") } } ?? "null"
         // Changes with each document, as Chrome's loader does.
         let loader = web.backForwardList.currentItem.map { String(UInt(bitPattern: ObjectIdentifier($0).hashValue), radix: 16) } ?? "0"
-        return ["id": frameID(tab), "loaderId": loader.uppercased(), "url": url?.absoluteString ?? "about:blank",
+        return ["id": frameID(id), "loaderId": loader.uppercased(), "url": url?.absoluteString ?? "about:blank",
                 "domainAndRegistry": "", "securityOrigin": origin, "mimeType": "text/html",
                 "secureContextType": url?.scheme == "https" ? "Secure" : "InsecureScheme",
                 "crossOriginIsolatedContextType": "NotIsolated", "gatedAPIFeatures": [Any]()]
@@ -634,7 +635,7 @@ enum ExtensionDebugger {
     }
 
     /// The DOM and object commands, done by the kit in the page.
-    private static func kit(_ method: String, _ params: [String: Any], in web: WKWebView) async throws -> Any {
+    private static func kit(_ method: String, _ params: [String: Any], in web: WKWebView, frame: String) async throws -> Any {
         var body = kitSource + "\nconst P = JSON.parse(params);\n"
         body += #"""
         const target = () => P.objectId != null ? K.get(P.objectId) : K.get(P.nodeId != null ? P.nodeId : P.backendNodeId);
@@ -712,7 +713,7 @@ enum ExtensionDebugger {
         case "DOM.removeNode": element().remove(); return {};
         case "DOM.setNodeValue": element().nodeValue = P.value; return {};
         case "DOM.getNodeForLocation": {
-          const n = document.elementFromPoint(P.x - (P.includeUserAgentShadowDOM ? 0 : 0), P.y);
+          const n = document.elementFromPoint(P.x, P.y);
           if (!n) throw new Error("No node found at given location");
           return { backendNodeId: K.put(n), nodeId: K.put(n), frameId: frameId };
         }
@@ -720,7 +721,7 @@ enum ExtensionDebugger {
         throw new Error("'" + method + "' wasn't found");
         """#
         do {
-            let found = try await script(body, ["method": method, "params": json(params), "frameId": ""], in: web)
+            let found = try await script(body, ["method": method, "params": json(params), "frameId": frame], in: web)
             return found ?? [String: Any]()
         } catch {
             throw Failure(message: pageError(error))

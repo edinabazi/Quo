@@ -2719,11 +2719,13 @@ enum ExtensionShims {
           if (!tab) throw new Error("No tab with given id " + id + ".");
           return { tab, place: placeOf(tab, await frames()) };
         };
+        // The tab's main frame, as the browser names it (ExtensionDebugger.frameID).
+        const frameOf = (id) => Math.max(id, 0).toString(16).toUpperCase().padStart(32, "0");
         const contextOf = (id, url) => {
           let origin = "";
           try { origin = new URL(url).origin; } catch (e) {}
           return { context: { id: 1, origin, name: "", uniqueId: "quo-" + id,
-            auxData: { isDefault: true, type: "default", frameId: "" } } };
+            auxData: { isDefault: true, type: "default", frameId: frameOf(id) } } };
         };
         // Chrome says so when an attached tab goes, or leaves the web.
         if (chrome.tabs && chrome.tabs.onRemoved) chrome.tabs.onRemoved.addListener((id) => {
@@ -2735,7 +2737,7 @@ enum ExtensionShims {
         if (chrome.tabs && chrome.tabs.onUpdated) chrome.tabs.onUpdated.addListener((id, change, tab) => {
           if (!mine.has(id) || !change.url) return;
           if (paged.has(id)) tell(onEvent, [{ tabId: id }, "Page.frameNavigated",
-            { frame: { id: "", loaderId: String(Date.now()), url: change.url, securityOrigin: "", mimeType: "text/html" }, type: "Navigation" }]);
+            { frame: { id: frameOf(id), loaderId: String(Date.now()), url: change.url, securityOrigin: (() => { try { return new URL(change.url).origin; } catch (e) { return ""; } })(), mimeType: "text/html" }, type: "Navigation" }]);
           if (ran.has(id)) {
             tell(onEvent, [{ tabId: id }, "Runtime.executionContextsCleared", {}]);
             tell(onEvent, [{ tabId: id }, "Runtime.executionContextCreated", contextOf(id, change.url)]);
@@ -2743,7 +2745,11 @@ enum ExtensionShims {
         });
         put2("debugger", {
           attach: answered(async (target, version) => {
-            const id = tabOf(target), { place } = await placed(id);
+            const id = tabOf(target);
+            // Twice from the same background is refused, as in Chrome; a
+            // background started afresh, which knows of none, attaches again.
+            if (mine.has(id)) throw new Error("Another debugger is already attached to the tab with id: " + id + ".");
+            const { place } = await placed(id);
             await native("debugger.attach", [id, place, String(version || "")]);
             mine.add(id);
           }),

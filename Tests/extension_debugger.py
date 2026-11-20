@@ -213,7 +213,7 @@ def main():
           let again = null; try {{ await chrome.debugger.attach({{ tabId: {F} }}, "1.3"); }} catch (e) {{ again = e.message; }}
           return {{ attached: targets.find((x) => x.tabId === {F}).attached, again }};""")
         t.ok("attaches, and getTargets says so", (r.get("ok") or {}).get("attached") is True, r)
-        t.ok("a second attach is refused", "already attached" in str((r.get("ok") or {}).get("again")), r)
+        t.ok("a second attach from the same background is refused", "already attached" in str((r.get("ok") or {}).get("again")), r)
         r = step(page, "enable", f"await cdp({F}, 'Page.enable'); await cdp({F}, 'Runtime.enable'); return await cdp({F}, 'Network.enable');")
         t.ok("Page, Runtime and Network enable", r.get("ok") == {}, r)
 
@@ -310,13 +310,16 @@ def main():
           const called = await cdp({F}, 'Runtime.callFunctionOn', {{ objectId: object.objectId, functionDeclaration: 'function (suffix) {{ return this.textContent + suffix; }}', arguments: [{{ value: '!' }}], returnByValue: true }});
           const metrics = await cdp({F}, 'Page.getLayoutMetrics');
           const tree = await cdp({F}, 'Page.getFrameTree');
+          const at = await cdp({F}, 'DOM.getNodeForLocation', {{ x: 5, y: 5 }});
           return {{ name: root.nodeName, nodeId, width: box.width, called: called.result.value, sub: object.subtype,
-                    vw: metrics.cssLayoutViewport.clientWidth, url: tree.frameTree.frame.url }};""")
+                    vw: metrics.cssLayoutViewport.clientWidth, url: tree.frameTree.frame.url,
+                    frame: tree.frameTree.frame.id, frameAt: at.frameId }};""")
         ok = r.get("ok") or {}
         t.ok("DOM.getDocument and querySelector", ok.get("name") == "#document" and ok.get("nodeId", 0) > 0, r)
         t.ok("getBoxModel, resolveNode and callFunctionOn on the node", ok.get("width", 0) > 0 and ok.get("sub") == "node"
              and ok.get("called") == "Continue!", r)
         t.ok("layout metrics and the frame tree", ok.get("vw", 0) > 0 and ok.get("url", "").startswith(base + "/form"), r)
+        t.ok("the frame has one id, as Chrome names one", len(ok.get("frame", "")) == 32 and ok.get("frame") == ok.get("frameAt"), r)
 
         # The wheel scrolls the box under it.
         r = step(page, "wheel", f"""
