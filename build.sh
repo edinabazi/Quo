@@ -319,6 +319,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <string>Files you download are saved to your Downloads folder.</string>
   <!-- Only once you turn on Settings › Passwords › Fill in your contact
        details: your own card, never anyone else's (MeCard.swift). -->
+  <!-- Only once you press Show My Meetings over a pinned calendar: your
+       next meetings, read on this Mac, for its countdown and Join
+       (Glance.swift). -->
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>With a calendar pinned, $NAME counts down to your next meeting on the pin and offers Join when it starts. It reads your meetings on this Mac and sends them nowhere.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>With a calendar pinned, $NAME counts down to your next meeting on the pin and offers Join when it starts. It reads your meetings on this Mac and sends them nowhere.</string>
   <key>NSContactsUsageDescription</key>
   <string>$NAME fills in forms with the details on your own card in Contacts, once you pick them under a box. It reads no one else's card and saves no copy of yours.</string>
 </dict>

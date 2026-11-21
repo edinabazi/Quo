@@ -4221,6 +4221,72 @@ final class Bench {
                 window.contentView = nil
             }
 
+        case "hoverrow":
+            // The pointer on a row of the column (id), or off it: its cross
+            // and the rest of what a hover shows, for a picture.
+            guard let tab = find(request, in: browser) else { answer(["error": "hoverrow needs a tab"]); return }
+            Bench.hoverRows[tab.id]?(request["on"] as? Bool ?? true)
+            answer(["hovered": Bench.hoverRows[tab.id] != nil])
+
+        case "glance":
+            // A pinned calendar's countdown and Join, and a pinned inbox's
+            // unread (Glance.swift), from meetings and mail given here.
+            // Only on a test run: nothing of the Mac's calendars is read.
+            guard Store.testing else { answer(["error": "glance only works on a --test run"]); return }
+            let meetings = Meetings.shared
+            if let paths = request["standIn"] as? [String: String] {
+                GlanceKind.standIn = paths.compactMapValues { $0 == "calendar" ? .calendar : $0 == "mail" ? .mail : nil }
+            }
+            if let given = request["meetings"] as? [[String: Any]] {
+                meetings.inject(given.map { (title: $0["title"] as? String ?? "Meeting", inMinutes: $0["in"] as? Double ?? 10,
+                                             minutes: $0["minutes"] as? Double ?? 30, link: $0["link"] as? String) })
+                meetings.watch()
+            }
+            if let tab = find(request, in: browser), let given = request["mail"] as? [[String: Any]] {
+                Inbox.shared.inject(given.enumerated().map { index, mail in
+                    Inbox.Mail(id: "bench-\(index)", from: mail["from"] as? String ?? "", subject: mail["subject"] as? String ?? "",
+                               summary: mail["summary"] as? String ?? "", when: nil, link: nil)
+                }, for: tab.id)
+            }
+            // A notification from Gmail, as its pinned tab would send one.
+            if let tab = find(request, in: browser), let note = request["note"] as? [String: String] {
+                Inbox.shared.noted(origin: "https://mail.google.com", title: note["title"] ?? "", body: note["body"] ?? "", tab: tab.id)
+            }
+            // The pin's card, as the pointer resting on it brings it.
+            if let tab = find(request, in: browser), let on = request["hover"] as? Bool {
+                GlanceHover.shared.pin(browser, tab, at: GlanceHover.shared.frames[tab.id] ?? .zero, hovering: on)
+            }
+            // A row the preview read from the page, taken as a click.
+            if let tab = find(request, in: browser), let row = request["open"] as? String {
+                Inbox.shared.open(Inbox.Mail(id: row, from: "", subject: "", summary: "", when: nil, link: nil, row: row), in: tab)
+                answer(["opened": row])
+                return
+            }
+            // The inbox read as the preview reads it: its feed, or the page.
+            if let tab = find(request, in: browser), request["fetch"] as? Bool == true {
+                Inbox.shared.forget(tab.id)
+                Task { @MainActor in
+                    await Inbox.shared.refresh(tab)
+                    let mails = Inbox.shared.mail[tab.id] ?? []
+                    answer(["mails": mails.count, "from": mails.map(\.from), "subjects": mails.map(\.subject),
+                            "rows": mails.compactMap(\.row), "feedless": Inbox.shared.feedless.contains(tab.id)])
+                }
+                return
+            }
+            let next = meetings.next
+            var said: [String: Any] = [
+                "next": next?.title ?? "", "countdown": next.flatMap { Meetings.countdown(to: $0, now: meetings.now) } ?? "",
+                "joinable": meetings.joinable?.title ?? "", "row": MeetingRow.shows(browser), "upcoming": meetings.upcoming.count,
+            ]
+            if let tab = find(request, in: browser) {
+                said["kind"] = GlanceKind.of(tab.address).map { "\($0)" } ?? ""
+                said["unread"] = Inbox.unread(in: tab.title) ?? 0
+                said["mails"] = Inbox.shared.mail[tab.id]?.count ?? 0
+                said["latest"] = Inbox.shared.latest(for: tab).map { [$0.from, $0.subject, $0.summary] } ?? []
+                said["card"] = GlanceHover.shared.shown?.tab == tab.id
+            }
+            answer(said)
+
         case "lookpicker":
             // The space's Colour… picker (SpaceGradient.swift), drawn off
             // screen as it stands for the space on screen, to a PNG at PATH.
@@ -4825,7 +4891,7 @@ final class Bench {
 
         default:
             answer(["error": "unknown command “\(verb)”", "commands": [
-                "tabs", "open", "go", "openmark", "close", "wait", "sleep", "select", "text", "nowplaying", "agent", "kept", "eval", "click", "type", "submit", "shot", "snap", "probe", "key", "textcheck", "resize", "hit", "pointer", "film", "float", "window", "pages", "picture", "pdf", "place", "group", "tospace", "field", "bookmark", "marks", "menu", "keyeq", "fill", "pin", "middle", "windows", "alive", "quit", "towindow", "news", "pull", "magnify", "wheel", "space", "split", "strip", "column", "welcome", "lookpicker", "fold", "consent", "update", "site", "little", "ui", "import", "import-preview", "import-file", "import-file-start", "import-file-status", "import-file-cancel", "remove-folder", "passwords", "accounts", "find", "answer", "visible", "ai", "notifications", "popups", "suggest", "translate", "profile", "settings", "filterlists", "sync",
+                "tabs", "open", "go", "openmark", "close", "wait", "sleep", "select", "text", "nowplaying", "agent", "kept", "eval", "click", "type", "submit", "shot", "snap", "probe", "key", "textcheck", "resize", "hit", "pointer", "film", "float", "window", "pages", "picture", "pdf", "place", "group", "tospace", "field", "bookmark", "marks", "menu", "keyeq", "fill", "pin", "middle", "windows", "alive", "quit", "towindow", "news", "pull", "magnify", "wheel", "space", "split", "strip", "column", "welcome", "lookpicker", "glance", "hoverrow", "fold", "consent", "update", "site", "little", "ui", "import", "import-preview", "import-file", "import-file-start", "import-file-status", "import-file-cancel", "remove-folder", "passwords", "accounts", "find", "answer", "visible", "ai", "notifications", "popups", "suggest", "translate", "profile", "settings", "filterlists", "sync",
 
                 "tabs", "open", "go", "openmark", "close", "wait", "sleep", "select", "text", "nowplaying", "player", "agent", "eval", "click", "type", "submit", "shot", "snap", "probe", "key", "textcheck", "resize", "hit", "pointer", "film", "float", "window", "pages", "picture", "pdf", "place", "group", "tospace", "field", "bookmark", "marks", "menu", "keyeq", "fill", "pin", "middle", "windows", "alive", "quit", "towindow", "news", "pull", "magnify", "wheel", "space", "split", "strip", "column", "fold", "consent", "update", "site", "little", "ui", "import", "import-preview", "import-file", "import-file-start", "import-file-status", "import-file-cancel", "remove-folder", "passwords", "accounts", "find", "answer", "visible", "ai", "notifications", "popups", "suggest", "translate", "profile", "settings",
             ]])

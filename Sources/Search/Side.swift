@@ -18,6 +18,8 @@ final class HeldEdges: ObservableObject {
 struct SideBar: View {
     @ObservedObject var browser: Browser
     @ObservedObject var prefs: Preferences
+    /// The meetings, for the Join row over the foot and the room it takes.
+    @ObservedObject private var meetings = Meetings.shared
     @ObservedObject private var agents = AgentControl.shared
     /// Downloads, for their cards over the foot (DownloadShelf).
     @ObservedObject private var fetches = Shared.fetches
@@ -176,6 +178,7 @@ struct SideBar: View {
             // and of what plays in another tab, over the foot.
             .padding(.bottom, footHeight + (browser.player == nil ? 0 : rowHeight + SideBar.playerGap)
                      + (agentHere && !icons ? SideBar.agentRow + SideBar.playerGap : 0)
+                     + (!icons && MeetingRow.shows(browser) ? MeetingRow.height + SideBar.playerGap : 0)
                      + (icons ? 0 : DownloadShelf.height(browser, fetches)))
             .animation(Motion.settle, value: icons ? 0 : DownloadShelf.height(browser, fetches))
 
@@ -189,6 +192,12 @@ struct SideBar: View {
                         .padding(.horizontal, 10)
                         .padding(.bottom, SideBar.playerGap)
                         .transition(.opacity)
+                }
+                // A meeting about to start, with Join (Glance.swift).
+                if !icons {
+                    MeetingRow(browser: browser)
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, MeetingRow.shows(browser) ? SideBar.playerGap : 0)
                 }
                 if let tab = browser.player {
                     PlayerRow(browser: browser, prefs: prefs, tab: tab)
@@ -1440,7 +1449,7 @@ private struct PinSquare: View, Equatable {
                 // Its page on the way, as a row's ring says.
                 Ring(size: scale * 11 / 34)
             } else if prefs.glyph == .icons, let icon = tab.icon {
-                Mark(icon: icon, letter: tab.pin ?? "", size: scale * 16 / 34, dim: tab.asleep)
+                Mark(icon: icon, letter: tab.pin ?? "", size: scale * 15 / 34, dim: tab.asleep)
             } else {
                 Text(tab.pin ?? "")
                     .font(.system(size: scale * 12 / 34, weight: .medium))
@@ -1449,6 +1458,9 @@ private struct PinSquare: View, Equatable {
         }
         .frame(width: scale * 16 / 34, height: scale * 16 / 34)
         .frame(width: width, height: height)
+        // A pinned calendar's countdown or an inbox's unread dot in the
+        // square's corner, as Arc's (Glance.swift); nothing on other pins.
+        .overlay(alignment: .bottomTrailing) { GlanceCorner(tab: tab, scale: scale) }
         .background {
             Group {
                 if live {
@@ -1497,7 +1509,10 @@ private struct PinSquare: View, Equatable {
         .overlay { MiddleClick { browser.close(tab) } }
         .onHover { hovering = $0 }
         .contextMenu { TabMenu(browser: browser, tab: tab, close: { browser.close(tab) }) }
-        .help(tab.label)
+        // A pinned calendar or inbox: a card beside it on a hover, in place
+        // of the name (Glance.swift).
+        .modifier(PinGlance(browser: browser, tab: tab, hovering: hovering))
+        .help(GlanceKind.of(tab.address) == nil ? tab.label : "")
         .animation(nil, value: hovering)
         .transition(.scale(scale: 0.8).combined(with: .opacity))
     }
@@ -1567,6 +1582,8 @@ private struct SideRow: View, Equatable {
     }
 
     @State private var hovering = false
+    /// The pointer on the cross itself, which deepens its square.
+    @State private var onCross = false
     @State private var selectedOnPress = false
     @State private var shake: CGFloat = 0
     @State private var pressed = false
@@ -1701,27 +1718,33 @@ private struct SideRow: View, Equatable {
         }
         .overlay(alignment: .trailing) {
             if !editing {
+                // Drawn as ⌘T's Switch to Tab arrow is (Omnibox): the same
+                // square, glyph and wash, deeper under the pointer.
+                let box: CGFloat = prefs.roomyTabs ? 20 : 18
                 ZStack {
                     if hovering && closable {
                         // A pinned row is put down, not closed (see
                         // Browser.close), and says so, as Arc's does; so is
                         // a grouped tab's page while it is open (closeTab).
                         Image(systemName: tab.pin != nil || (putsAway && !tab.asleep) ? "minus" : "xmark")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Palette.muted)
-                            .frame(width: 15, height: 15)
-                            .background(Palette.ink.opacity(0.07), in: Circle())
+                            .font(.system(size: prefs.roomyTabs ? 10.5 : 9, weight: .semibold))
+                            .foregroundStyle(onCross ? Palette.ink : Palette.muted)
+                            .frame(width: box, height: box)
+                            .background(Palette.ink.opacity(onCross ? 0.12 : 0.06),
+                                        in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .animation(Motion.quick, value: onCross)
                             .transition(.opacity)
                     }
                 }
-                .frame(width: 15, height: 15)
+                .frame(width: box, height: box)
                 .overlay {
                     Color.clear
                         .frame(width: 30, height: prefs.sideRow)
                         .contentShape(Rectangle())
+                        .onHover { onCross = $0 }
                         .onTapGesture { if hovering && closable { close() } }
                 }
-                .padding(.trailing, 7)
+                .padding(.trailing, 6)
             }
         }
         .animation(Motion.quick, value: tab.loading)

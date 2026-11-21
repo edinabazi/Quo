@@ -8,6 +8,8 @@
   <key>com.apple.security.device.audio-input</key><true/>
   <key>com.apple.security.personal-information.location</key><true/>
   <key>com.apple.security.personal-information.addressbook</key><true/>
+  <!-- A pinned calendar's countdown and Join (Glance.swift), once asked. -->
+  <key>com.apple.security.personal-information.calendars</key><true/>
   <!-- Quo's own, with Quo.provisionprofile (quo.sh): the two identifiers tie
        the app to the profile, without which macOS refuses the rest. -->
   <key>com.apple.application-identifier</key><string>8B6VFDJHA2.com.edinabazi.quo</string>

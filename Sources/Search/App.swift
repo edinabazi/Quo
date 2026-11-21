@@ -942,6 +942,8 @@ struct ContentView: View {
             .overlay(alignment: .bottom) { bars }
             // The bookmarks risen from the column's foot, over the column.
             .overlay { bookmarksFloat.ignoresSafeArea() }
+            // A pinned calendar's or inbox's card, beside its pin (Glance.swift).
+            .overlay { GlanceFloat(browser: browser, onRight: sideOnRight).ignoresSafeArea() }
             .overlay {
                 // Over the page only: the column, the strip and the bookmarks
                 // bar stay as they are, uncovered and in reach.

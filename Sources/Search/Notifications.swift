@@ -152,6 +152,9 @@ final class SiteNotifications: NSObject {
     // MARK: - posting
 
     func post(id: String, title: String, body: String, origin: String, tag: String, info: [String: Any]) {
+        // Gmail's, for its pinned tab's card (Glance.swift), as Arc's showed.
+        Inbox.shared.noted(origin: origin, title: title, body: body,
+                           tab: (info[SiteNotifications.senderKey] as? String).flatMap(UUID.init(uuidString:)))
         guard !Store.testing else {
             recorded.append(["title": title, "body": body, "origin": origin, "tag": tag, "kind": info["search.kind"] as? String ?? "",
                              "tab": info[SiteNotifications.senderKey] as? String ?? ""])
