@@ -192,7 +192,7 @@ private struct SplitTabHalf: View {
     private var hovering: Bool { hovered == tab.id }
     private var title: String { tab.label.isEmpty ? "New Tab" : tab.label }
     private var playing: Bool { !tab.loading && (tab.noisy || tab.muted) }
-    private var editing: Bool { browser.editingTab == tab.id && (browser.renamingTab || !browser.addressBarUp) }
+    private var editing: Bool { interactive && browser.editingTab == tab.id && (browser.renamingTab || !browser.addressBarUp) }
     /// Where the page is, said on the half you're on (Settings › Tabs › Show
     /// the address on the tab you're on).
     /// Never with the address bar up: the bar says it, the half its title.

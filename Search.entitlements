@@ -12,5 +12,7 @@
   <!-- Your own card in Contacts, for filling in forms (MeCard.swift), once
        you turn it on. -->
   <key>com.apple.security.personal-information.addressbook</key><true/>
+  <!-- A pinned calendar's countdown and Join (Glance.swift), once asked. -->
+  <key>com.apple.security.personal-information.calendars</key><true/>
 </dict>
 </plist>

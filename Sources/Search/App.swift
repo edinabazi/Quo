@@ -129,8 +129,8 @@ struct SearchApp: App {
                         ))
                     }
                 }
-                // Moved here from Settings, as Safari has it. WebKit reads it
-                // once, so it counts from the next page on.
+                // Moved here from Settings, as Safari has it: every page,
+                // open or to come (Preferences.switchWebKit).
                 Menu("Spelling and Grammar") {
                     Toggle("Correct Spelling Automatically", isOn: Binding(
                         get: { browser.prefs.autocorrect },
@@ -238,7 +238,7 @@ struct SearchApp: App {
                     .shortcut("view.zoomIn")
                 Button("Zoom Out") { browser.zoom(by: 1 / 1.1) }
                     .shortcut("view.zoomOut")
-                Button("Actual Size") { browser.resetZoom() }
+                Button(browser.prefs.actualSizeTitle) { browser.resetZoom() }
                     .shortcut("view.actualSize")
                 Divider()
                 // The Web Inspector, on the keys Chrome and Arc use (see Inspector.swift).
@@ -248,6 +248,14 @@ struct SearchApp: App {
                     .shortcut("view.console")
                 Button("Inspect Element") { browser.inspectElement() }
                     .shortcut("view.inspect")
+                // The system's own item, which replacing the toolbar group
+                // above took with it: ⌃⌘F did nothing (#1176). The key is
+                // the Mac's, never offered in Settings › Shortcuts.
+                Divider()
+                Button(browser.fullScreen ? "Exit Full Screen" : "Enter Full Screen") {
+                    (NSApp.keyWindow ?? browser.window)?.toggleFullScreen(nil)
+                }
+                .keyboardShortcut("f", modifiers: [.control, .command])
             }
             CommandMenu("Tabs") {
                 Button("Back") { browser.back() }
@@ -934,6 +942,8 @@ struct ContentView: View {
             .overlay(alignment: .bottom) { bars }
             // The bookmarks risen from the column's foot, over the column.
             .overlay { bookmarksFloat.ignoresSafeArea() }
+            // A pinned calendar's or inbox's card, beside its pin (Glance.swift).
+            .overlay { GlanceFloat(browser: browser, onRight: sideOnRight).ignoresSafeArea() }
             .overlay {
                 // Over the page only: the column, the strip and the bookmarks
                 // bar stay as they are, uncovered and in reach.
@@ -1628,6 +1638,25 @@ struct ContentView: View {
             }
             browser.tabSwitcher.cancel()
             if event.keyCode == 53 { return true }
+        }
+
+        // The accounts hanging from the sign-in box the caret is in: ↓ and ↑
+        // move through them, as in Safari and Chrome, and Return takes the
+        // one lit, as a click would (⇧Return: one of your card's rows into
+        // the box alone). Until an arrow lights one, Return is the page's and
+        // sends its form, and ↑ moves the caret as it always did.
+        // A word still being composed (Japanese, Chinese, Korean input) keeps
+        // ↓, ↑ and Return for its own candidates.
+        if browser.suggesting != nil, let page = event.window?.firstResponder as? PageView,
+           !((page as AnyObject as? NSTextInputClient)?.hasMarkedText() ?? false),
+           flags.intersection([.command, .option, .control]).isEmpty {
+            let shifted = flags.contains(.shift)
+            switch event.keyCode {
+            case 125 where !shifted: if browser.moveChoice(by: 1) { return true }
+            case 126 where !shifted: if browser.moveChoice(by: -1) { return true }
+            case 36, 76: if browser.takeLitChoice(alone: shifted) { return true }
+            default: break
+            }
         }
 
         // Escape puts the page back. On a blank tab there is no page to put

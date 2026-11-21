@@ -173,6 +173,7 @@ enum SettingsIndex {
               keys: ["sidebar.hides"], words: ["auto hide", "sidebar"], parent: "tabs.layout"),
         .init(id: "sidebar.slides", group: "window", icon: "rectangle.lefthalf.inset.filled.arrow.left",
               title: "Slide the column in and out", detail: "A gentler slide when ⌘S or the window's edge brings the column out or puts it away",
+              more: "With Reduce Motion on in System Settings › Accessibility › Display, the column fades in and out instead. With Reduce animations on, it comes and goes at once.",
               keys: [Motion.slidesKey], words: ["animation", "animate", "smooth", "slide", "sidebar", "arc"], parent: "tabs.layout"),
         .init(id: "sidebar.foldIcons", group: "window", icon: "arrow.down.right.and.arrow.up.left",
               title: "⌘S makes the column icons only", detail: "The tabs stay in sight as a narrow column of icons; ⌘S again brings the titles back",
@@ -482,7 +483,7 @@ enum SettingsIndex {
         .init(id: "clear.cookies", group: "clear", icon: "person.crop.circle.badge.xmark",
               title: "Cookies and sign-ins", detail: "Signs you out of every site", words: ["cookies", "sign out"]),
         .init(id: "clear.cache", group: "clear", icon: "internaldrive",
-              title: "Cache", detail: "Only what was fetched to draw pages", words: ["clear cache"]),
+              title: "Cache", detail: "Only what was fetched to draw pages", words: ["clear cache", "empty caches", "cache storage"]),
 
         // Keyboard & Mouse
         .init(id: "links.peek", group: "mouse", icon: "eye",
