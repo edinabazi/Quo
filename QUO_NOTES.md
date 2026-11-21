@@ -2,6 +2,16 @@
 
 Newest first. Each version starts with its own heading, `## 0.1.0 · 20 November 2026`, and the paragraphs under it. The first paragraph of the newest is the line under the version in Settings › About and the release's notes on GitHub; all of them are in Settings › About › What's New, above Search's own.
 
+## 0.4.0 · 21 November 2026
+
+Pinned Calendar and Gmail that tell you what's coming, as Arc's did, plus the fixes and import support from Search 1.0.16.
+
+A pinned Google Calendar counts down to your next meeting in the corner of its pin, 30m and then now, and offers Join over the foot of the column a few minutes before a call. Pinned Gmail shows a small red dot while you have unread mail. Rest the pointer on either and a card comes up beside it: your next meetings with Join, or your latest email as Gmail's notification said it, with a + to write a new one. Your meetings are read from the calendars on this Mac once you allow it, and nothing leaves it.
+
+From Search 1.0.16: no more crash on macOS 27.2, the ad blocker is on from the very first page after launch, and extensions like Zotero and Stylus work, with Settings saying why one couldn't start. Bring Things Over now brings Zen's spaces, open tabs from Firefox and Zen, Safari directly when macOS allows it, and more browsers, including Thorium, ChatGPT Atlas and Orion.
+
+A tab's close button matches ⌘T's Switch to Tab arrow, pinned icons are a touch smaller, and clicking the tab you're on to edit its address always works.
+
 ## 0.3.0 · 20 November 2026
 
 A new first run that opens with a flourish, every space at the column's foot as in Arc, and a smoother way to make a space.
